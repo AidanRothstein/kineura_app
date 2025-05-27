@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,17 +13,29 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   List<ScanResult> _scanResults = [];
   StreamSubscription<List<ScanResult>>? _scanSub;
+  bool isScanning = false;
 
   void _showBluetoothDevicesDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Bluetooth Devices'),
-        content: Container(
+        content: SizedBox(
           width: double.maxFinite,
           height: 300,
           child: Column(
             children: [
+              if (isScanning)
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(width: 12),
+                      Text("Scanning for devices..."),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: _scanResults.isEmpty
                     ? const Center(child: Text('No devices found'))
@@ -38,20 +50,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             title: Text(name),
                             subtitle: Text(device.remoteId.str),
                             trailing: Text('${_scanResults[index].rssi} dBm'),
+                            onTap: () => _connectToDevice(device),
                           );
                         },
                       ),
               ),
               ElevatedButton(
-                onPressed: () => _startDeviceScan(),
-                child: const Text('Scan for Devices'),
+                onPressed: isScanning ? null : _startDeviceScan,
+                child: Text(isScanning ? 'Scanning...' : 'Scan for Devices'),
               ),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              FlutterBluePlus.stopScan();
+              setState(() => isScanning = false);
+              Navigator.of(context).pop();
+            },
             child: const Text('Close'),
           ),
         ],
@@ -60,33 +77,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _startDeviceScan() async {
-    // Request permissions
     await Permission.bluetooth.request();
     await Permission.bluetoothScan.request();
     await Permission.bluetoothConnect.request();
     await Permission.locationWhenInUse.request();
 
-    // Clear previous results
-    setState(() => _scanResults.clear());
+    if (!await Permission.bluetoothScan.isGranted ||
+        !await Permission.bluetoothConnect.isGranted ||
+        !await Permission.locationWhenInUse.isGranted) {
+      print("❌ Missing required permissions.");
+      return;
+    }
 
-    // Start scan
-    await FlutterBluePlus.startScan(
-      timeout: const Duration(seconds: 10),
-      continuousUpdates: true,
-    );
+    setState(() {
+      _scanResults.clear();
+      isScanning = true;
+    });
 
-    // Cancel previous subscription if any
+    print("🚀 Starting BLE scan...");
     await _scanSub?.cancel();
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
 
-    // Listen to scan results
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      // Remove duplicates by device id
+      print("📡 Found ${results.length} devices:");
+      for (var r in results) {
+        print("🔍 ${r.device.platformName} - ${r.device.remoteId.str} (${r.rssi} dBm)");
+      }
+
       final unique = <String, ScanResult>{};
       for (var r in results) {
         unique[r.device.remoteId.str] = r;
       }
+
       setState(() => _scanResults = unique.values.toList());
     });
+
+    // Stop scan after timeout
+    Future.delayed(const Duration(seconds: 10), () async {
+      await FlutterBluePlus.stopScan();
+      setState(() => isScanning = false);
+      print("⏹️ Scan stopped");
+    });
+  }
+
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    print("▶️ Trying to connect to: ${device.platformName} [${device.remoteId.str}]");
+
+    try {
+      await FlutterBluePlus.stopScan();
+
+      var connectedDevices = await FlutterBluePlus.connectedSystemDevices;
+      if (connectedDevices.any((d) => d.remoteId == device.remoteId)) {
+        print("🔁 Already connected to ${device.platformName}");
+      } else {
+        await device.connect(timeout: const Duration(seconds: 10));
+        print("✅ Connected to ${device.platformName}");
+      }
+
+      final services = await device.discoverServices();
+      for (var service in services) {
+        print("🔧 Service: ${service.uuid}");
+        for (var char in service.characteristics) {
+          print("  - Characteristic: ${char.uuid}");
+        }
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text("Connected to ${device.platformName}"),
+            content: const Text("BLE connection successful."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
+      }
+
+    } catch (e) {
+      print("❌ Connection failed: $e");
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("Connection Error"),
+            content: Text("Failed to connect: $e"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -116,27 +206,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _navButton(
-                icon: Icons.school,
-                label: 'Learn',
-                onTap: () {},
-              ),
-              _navButton(
-                icon: Icons.history,
-                label: 'Past Workouts',
-                onTap: () {},
-              ),
+              _navButton(icon: Icons.school, label: 'Learn', onTap: () {}),
+              _navButton(icon: Icons.history, label: 'Past Workouts', onTap: () {}),
               const SizedBox(width: 48),
-              _navButton(
-                icon: Icons.devices,
-                label: 'My Devices',
-                onTap: () {},
-              ),
-              _navButton(
-                icon: Icons.person,
-                label: 'Profile',
-                onTap: () {},
-              ),
+              _navButton(icon: Icons.devices, label: 'My Devices', onTap: () {}),
+              _navButton(icon: Icons.person, label: 'Profile', onTap: () {}),
             ],
           ),
         ),
@@ -165,10 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icon(icon),
           onPressed: onTap,
         ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12)),
       ],
     );
   }
