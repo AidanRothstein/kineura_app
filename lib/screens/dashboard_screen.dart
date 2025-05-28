@@ -7,6 +7,7 @@ import 'menu_screens/learn_screen.dart';
 import 'menu_screens/past_workouts_screen.dart';
 import 'menu_screens/my_devices_screen.dart';
 import 'menu_screens/profile_screen.dart';
+import 'menu_screens/live_workout_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,160 +17,86 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  List<ScanResult> _scanResults = [];
-  StreamSubscription<List<ScanResult>>? _scanSub;
-  bool isScanning = false;
+  List<BluetoothDevice> connectedDevices = [];
+  Set<String> selectedDeviceIds = {};
 
-  void _showBluetoothDevicesDialog(BuildContext context) {
+  @override
+  void initState() {
+    super.initState();
+    _loadConnectedDevices();
+  }
+
+  Future<void> _loadConnectedDevices() async {
+    final devices = await FlutterBluePlus.connectedSystemDevices;
+    setState(() {
+      connectedDevices = devices;
+    });
+  }
+
+  void _showConnectedDevicesPopup(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Bluetooth Devices'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: Column(
-            children: [
-              if (isScanning)
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(width: 12),
-                      Text("Scanning for devices..."),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: _scanResults.isEmpty
-                    ? const Center(child: Text('No devices found'))
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Connected Devices'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 300,
+                child: connectedDevices.isEmpty
+                    ? const Center(child: Text('No connected devices'))
                     : ListView.builder(
-                        itemCount: _scanResults.length,
+                        itemCount: connectedDevices.length,
                         itemBuilder: (context, index) {
-                          final device = _scanResults[index].device;
-                          final name = device.platformName.isNotEmpty
-                              ? device.platformName
-                              : '(unknown)';
+                          final device = connectedDevices[index];
+                          final deviceId = device.remoteId.str;
+                          final isSelected = selectedDeviceIds.contains(deviceId);
+                          final name = device.platformName.isNotEmpty ? device.platformName : '(unknown)';
+
                           return ListTile(
                             title: Text(name),
-                            subtitle: Text(device.remoteId.str),
-                            trailing: Text('${_scanResults[index].rssi} dBm'),
-                            onTap: () => _connectToDevice(device),
+                            subtitle: Text(deviceId),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle, color: Colors.green)
+                                : const Icon(Icons.radio_button_unchecked),
+                            onTap: () {
+                              setStateDialog(() {
+                                if (isSelected) {
+                                  selectedDeviceIds.remove(deviceId);
+                                } else {
+                                  selectedDeviceIds.add(deviceId);
+                                }
+                              });
+                            },
                           );
                         },
                       ),
               ),
-              ElevatedButton(
-                onPressed: isScanning ? null : _startDeviceScan,
-                child: Text(isScanning ? 'Scanning...' : 'Scan for Devices'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              FlutterBluePlus.stopScan();
-              setState(() => isScanning = false);
-              Navigator.of(context).pop();
-            },
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+              actions: [
+                if (selectedDeviceIds.isNotEmpty)
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LiveWorkoutScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text("Start Workout"),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
-  }
-
-  Future<void> _startDeviceScan() async {
-    await Permission.bluetooth.request();
-    await Permission.bluetoothScan.request();
-    await Permission.bluetoothConnect.request();
-    await Permission.locationWhenInUse.request();
-
-    if (!await Permission.bluetoothScan.isGranted ||
-        !await Permission.bluetoothConnect.isGranted ||
-        !await Permission.locationWhenInUse.isGranted) {
-      print("❌ Missing required permissions.");
-      return;
-    }
-
-    setState(() {
-      _scanResults.clear();
-      isScanning = true;
-    });
-
-    await _scanSub?.cancel();
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-
-    _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      final unique = <String, ScanResult>{};
-      for (var r in results) {
-        unique[r.device.remoteId.str] = r;
-      }
-      setState(() => _scanResults = unique.values.toList());
-    });
-
-    Future.delayed(const Duration(seconds: 10), () async {
-      await FlutterBluePlus.stopScan();
-      setState(() => isScanning = false);
-    });
-  }
-
-  Future<void> _connectToDevice(BluetoothDevice device) async {
-    try {
-      await FlutterBluePlus.stopScan();
-      var connectedDevices = await FlutterBluePlus.connectedSystemDevices;
-      if (!connectedDevices.any((d) => d.remoteId == device.remoteId)) {
-        await device.connect(timeout: const Duration(seconds: 10));
-      }
-
-      final services = await device.discoverServices();
-      for (var service in services) {
-        for (var char in service.characteristics) {
-          print("Characteristic: ${char.uuid}");
-        }
-      }
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text("Connected to ${device.platformName}"),
-            content: const Text("BLE connection successful."),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
-              )
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("Connection Error"),
-            content: Text("Failed to connect: $e"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
-              )
-            ],
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _scanSub?.cancel();
-    FlutterBluePlus.stopScan();
-    super.dispose();
   }
 
   void _navigateTo(Widget screen) {
@@ -203,9 +130,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       floatingActionButton: Tooltip(
-        message: 'Manage Bluetooth Devices',
+        message: 'Connected Devices',
         child: FloatingActionButton(
-          onPressed: () => _showBluetoothDevicesDialog(context),
+          onPressed: () {
+            _loadConnectedDevices().then((_) => _showConnectedDevicesPopup(context));
+          },
           shape: const CircleBorder(),
           child: const Icon(Icons.add, size: 32),
         ),
