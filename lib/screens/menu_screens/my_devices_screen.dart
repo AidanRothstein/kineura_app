@@ -3,22 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'menu_screens/learn_screen.dart';
-import 'menu_screens/past_workouts_screen.dart';
-import 'menu_screens/my_devices_screen.dart';
-import 'menu_screens/profile_screen.dart';
-
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+class MyDevicesScreen extends StatefulWidget {
+  const MyDevicesScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<MyDevicesScreen> createState() => _MyDevicesScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _MyDevicesScreenState extends State<MyDevicesScreen> {
+  List<BluetoothDevice> _connectedDevices = [];
   List<ScanResult> _scanResults = [];
   StreamSubscription<List<ScanResult>>? _scanSub;
   bool isScanning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConnectedDevices();
+  }
+
+  Future<void> _loadConnectedDevices() async {
+    final devices = await FlutterBluePlus.connectedSystemDevices;
+    setState(() => _connectedDevices = devices);
+  }
 
   void _showBluetoothDevicesDialog(BuildContext context) {
     showDialog(
@@ -107,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (var r in results) {
         unique[r.device.remoteId.str] = r;
       }
+
       setState(() => _scanResults = unique.values.toList());
     });
 
@@ -119,17 +127,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _connectToDevice(BluetoothDevice device) async {
     try {
       await FlutterBluePlus.stopScan();
+
       var connectedDevices = await FlutterBluePlus.connectedSystemDevices;
       if (!connectedDevices.any((d) => d.remoteId == device.remoteId)) {
         await device.connect(timeout: const Duration(seconds: 10));
       }
 
-      final services = await device.discoverServices();
-      for (var service in services) {
-        for (var char in service.characteristics) {
-          print("Characteristic: ${char.uuid}");
-        }
-      }
+      await _loadConnectedDevices();
 
       if (mounted) {
         showDialog(
@@ -147,6 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     } catch (e) {
+      print("❌ Connection failed: $e");
       if (mounted) {
         showDialog(
           context: context,
@@ -172,36 +177,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  void _navigateTo(Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: const Center(
-        child: Text(
-          "You're in!",
-          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+      appBar: AppBar(
+        title: const Text("My Devices Screen"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _navButton(icon: Icons.school, label: 'Learn', onTap: () => _navigateTo(const LearnScreen())),
-              _navButton(icon: Icons.history, label: 'Past Workouts', onTap: () => _navigateTo(const PastWorkoutsScreen())),
-              const SizedBox(width: 48),
-              _navButton(icon: Icons.devices, label: 'My Devices', onTap: () => _navigateTo(const MyDevicesScreen())),
-              _navButton(icon: Icons.person, label: 'Profile', onTap: () => _navigateTo(const ProfileScreen())),
-            ],
-          ),
-        ),
-      ),
+      body: _connectedDevices.isEmpty
+          ? const Center(child: Text('No devices connected.'))
+          : ListView.builder(
+              itemCount: _connectedDevices.length,
+              itemBuilder: (context, index) {
+                final device = _connectedDevices[index];
+                final name = device.platformName.isNotEmpty
+                    ? device.platformName
+                    : '(unknown)';
+                return ListTile(
+                  title: Text(name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.circle, color: Colors.green, size: 12),
+                      SizedBox(width: 6),
+                      Text('Connected', style: TextStyle(color: Colors.green)),
+                    ],
+                  ),
+                );
+              },
+            ),
       floatingActionButton: Tooltip(
         message: 'Manage Bluetooth Devices',
         child: FloatingActionButton(
@@ -211,16 +218,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
-  }
-
-  Widget _navButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(icon: Icon(icon), onPressed: onTap),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
     );
   }
 }
