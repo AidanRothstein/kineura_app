@@ -119,8 +119,17 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
       await device.disconnect();
       setState(() {
         connectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
-        previouslyConnectedDevices.add(device);
+
+        // Avoid duplicates in previouslyConnectedDevices
+        final alreadyListed = previouslyConnectedDevices.any(
+          (d) => d.remoteId == device.remoteId,
+        );
+
+        if (!alreadyListed) {
+          previouslyConnectedDevices.add(device);
+        }
       });
+      await _savePreviouslyConnectedDevice(device);
     } catch (e) {
       print("Disconnection failed: $e");
     }
