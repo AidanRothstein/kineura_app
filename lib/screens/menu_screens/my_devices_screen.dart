@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MyDevicesScreen extends StatefulWidget {
   const MyDevicesScreen({super.key});
@@ -10,7 +12,7 @@ class MyDevicesScreen extends StatefulWidget {
   State<MyDevicesScreen> createState() => _MyDevicesScreenState();
 }
 
-class _MyDevicesScreenState extends State<MyDevicesScreen> {
+class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingObserver {
   List<BluetoothDevice> connectedDevices = [];
   List<BluetoothDevice> previouslyConnectedDevices = [];
   List<ScanResult> _scanResults = [];
@@ -20,7 +22,29 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadConnectedDevices();
+    _loadPreviouslyConnectedDevices();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scanSub?.cancel();
+    FlutterBluePlus.stopScan();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshDeviceStatus();
+    }
+  }
+
+  Future<void> _refreshDeviceStatus() async {
+    await _loadConnectedDevices();
+    await _scanForPreviouslyConnectedDevices();
   }
 
   Future<void> _loadConnectedDevices() async {
@@ -28,6 +52,78 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
     setState(() {
       connectedDevices = allConnected;
     });
+  }
+
+  Future<void> _loadPreviouslyConnectedDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceIds = prefs.getStringList('known_device_ids') ?? [];
+    final devices = deviceIds.map((id) => BluetoothDevice(remoteId: DeviceIdentifier(id))).toList();
+    setState(() {
+      previouslyConnectedDevices = devices;
+    });
+    await _scanForPreviouslyConnectedDevices();
+  }
+
+  Future<void> _savePreviouslyConnectedDevice(BluetoothDevice device) async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceIds = prefs.getStringList('known_device_ids') ?? [];
+    if (!deviceIds.contains(device.remoteId.str)) {
+      deviceIds.add(device.remoteId.str);
+      await prefs.setStringList('known_device_ids', deviceIds);
+    }
+  }
+
+  Future<void> _scanForPreviouslyConnectedDevices() async {
+    await Permission.bluetoothScan.request();
+    if (!await Permission.bluetoothScan.isGranted) return;
+
+    final unique = <String, ScanResult>{};
+    final completer = Completer<void>();
+    _scanResults.clear();
+
+    _scanSub?.cancel();
+    _scanSub = FlutterBluePlus.scanResults.listen((results) {
+      for (var r in results) {
+        final name = r.device.platformName;
+        if (name.contains("Deez")) {
+          unique[r.device.remoteId.str] = r;
+        }
+      }
+      if (!completer.isCompleted && mounted) {
+        setState(() => _scanResults = unique.values.toList());
+      }
+    });
+
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 2));
+    await FlutterBluePlus.stopScan();
+    await completer.future;
+  }
+
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    try {
+      await FlutterBluePlus.stopScan();
+      await device.connect(timeout: const Duration(seconds: 10));
+      await _savePreviouslyConnectedDevice(device);
+      setState(() {
+        connectedDevices.add(device);
+        previouslyConnectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
+      });
+    } catch (e) {
+      print("Connection failed: $e");
+    }
+  }
+
+  Future<void> _disconnectFromDevice(BluetoothDevice device) async {
+    try {
+      await device.disconnect();
+      setState(() {
+        connectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
+        previouslyConnectedDevices.add(device);
+      });
+    } catch (e) {
+      print("Disconnection failed: $e");
+    }
   }
 
   void _showBluetoothDevicesDialog(BuildContext context) {
@@ -61,9 +157,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
                               itemCount: _scanResults.length,
                               itemBuilder: (context, index) {
                                 final device = _scanResults[index].device;
-                                final name = device.platformName.isNotEmpty
-                                    ? device.platformName
-                                    : '(unknown)';
+                                final name = device.platformName.isNotEmpty ? device.platformName : '(unknown)';
                                 return ListTile(
                                   title: Text(name),
                                   subtitle: Text(device.remoteId.str),
@@ -74,9 +168,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
                             ),
                     ),
                     ElevatedButton(
-                      onPressed: isScanning
-                          ? null
-                          : () => _startDeviceScan(setStateDialog),
+                      onPressed: isScanning ? null : () => _scanForPreviouslyConnectedDevices(),
                       child: Text(isScanning ? 'Scanning...' : 'Scan for Devices'),
                     ),
                   ],
@@ -86,7 +178,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
                 TextButton(
                   onPressed: () {
                     FlutterBluePlus.stopScan();
-                    setStateDialog(() => isScanning = false);
+                    if (mounted) setStateDialog(() => isScanning = false);
                     Navigator.of(context).pop();
                   },
                   child: const Text('Close'),
@@ -99,74 +191,6 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
     );
   }
 
-  Future<void> _startDeviceScan(void Function(void Function()) setStateDialog) async {
-    await Permission.bluetooth.request();
-    await Permission.bluetoothScan.request();
-    await Permission.bluetoothConnect.request();
-    await Permission.locationWhenInUse.request();
-
-    if (!await Permission.bluetoothScan.isGranted ||
-        !await Permission.bluetoothConnect.isGranted ||
-        !await Permission.locationWhenInUse.isGranted) {
-      print("❌ Missing required permissions.");
-      return;
-    }
-
-    setStateDialog(() {
-      _scanResults.clear();
-      isScanning = true;
-    });
-
-    await _scanSub?.cancel();
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-
-    _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      final unique = <String, ScanResult>{};
-      for (var r in results) {
-        unique[r.device.remoteId.str] = r;
-      }
-
-      setStateDialog(() => _scanResults = unique.values.toList());
-    });
-
-    Future.delayed(const Duration(seconds: 10), () async {
-      await FlutterBluePlus.stopScan();
-      setStateDialog(() => isScanning = false);
-    });
-  }
-
-  Future<void> _connectToDevice(BluetoothDevice device) async {
-    try {
-      await FlutterBluePlus.stopScan();
-      await device.connect(timeout: const Duration(seconds: 10));
-      setState(() {
-        connectedDevices.add(device);
-        previouslyConnectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
-      });
-    } catch (e) {
-      print("Connection failed: $e");
-    }
-  }
-
-  Future<void> _disconnectFromDevice(BluetoothDevice device) async {
-    try {
-      await device.disconnect();
-      setState(() {
-        connectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
-        previouslyConnectedDevices.add(device);
-      });
-    } catch (e) {
-      print("Disconnection failed: $e");
-    }
-  }
-
-  @override
-  void dispose() {
-    _scanSub?.cancel();
-    FlutterBluePlus.stopScan();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -176,6 +200,12 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshDeviceStatus,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -214,15 +244,25 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
               const Text('No previous devices.')
             else
               Column(
-                children: previouslyConnectedDevices.map((device) {
+                children: previouslyConnectedDevices.where((device) =>
+                  !connectedDevices.any((c) => c.remoteId == device.remoteId)
+                ).map((device) {
+                  final isAvailable = _scanResults.any((r) => r.device.remoteId == device.remoteId);
+
                   return ListTile(
                     title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.circle, color: Colors.grey, size: 12),
-                        SizedBox(width: 6),
-                        Text('Not Connected'),
+                      children: [
+                        Icon(Icons.circle, color: isAvailable ? Colors.orange : Colors.grey, size: 12),
+                        const SizedBox(width: 6),
+                        Text(isAvailable ? 'Available' : 'Offline'),
+                        if (isAvailable)
+                          IconButton(
+                            icon: const Icon(Icons.link),
+                            tooltip: 'Reconnect',
+                            onPressed: () => _connectToDevice(device),
+                          ),
                       ],
                     ),
                   );
