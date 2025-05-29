@@ -28,7 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  flutter_blue_plus: ^1.2.0
+  flutter_blue_plus: ^1.35.5
   permission_handler: ^12.0.0 # For Android 12+ permission handling
   flutter:
     sdk: flutter
@@ -70,6 +70,27 @@ flutter:
   assets:
      - assets/K icon.jpg
      - assets/Rothstein-1RM_1622.JPG
+     - assets/K_icon-nobg.png
+     - assets/fonts/
+
+  fonts:
+    - family: SourceSans3
+      fonts:
+        - asset: assets/fonts/SourceSans3-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/SourceSans3-Light.ttf
+          weight: 300
+        - asset: assets/fonts/SourceSans3-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/SourceSans3-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SourceSans3-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SourceSans3-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SourceSans3-Black.ttf
+          weight: 900
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
