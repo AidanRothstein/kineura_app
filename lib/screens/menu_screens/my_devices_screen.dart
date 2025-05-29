@@ -119,12 +119,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
       await device.disconnect();
       setState(() {
         connectedDevices.removeWhere((d) => d.remoteId == device.remoteId);
-
-        // Avoid duplicates in previouslyConnectedDevices
-        final alreadyListed = previouslyConnectedDevices.any(
-          (d) => d.remoteId == device.remoteId,
-        );
-
+        final alreadyListed = previouslyConnectedDevices.any((d) => d.remoteId == device.remoteId);
         if (!alreadyListed) {
           previouslyConnectedDevices.add(device);
         }
@@ -133,6 +128,48 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
     } catch (e) {
       print("Disconnection failed: $e");
     }
+  }
+
+  Future<void> _clearAllDevices() async {
+    // Disconnect all connected devices
+    for (BluetoothDevice device in connectedDevices) {
+      try {
+        await device.disconnect();
+      } catch (e) {
+        print("Failed to disconnect device ${device.remoteId}: $e");
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('known_device_ids');
+
+    setState(() {
+      connectedDevices.clear();
+      previouslyConnectedDevices.clear();
+    });
+  }
+
+  void _showClearDevicesDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear all devices?'),
+        content: const Text('This will remove and disconnect all saved devices.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: const Text('Clear'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _clearAllDevices();
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   void _showBluetoothDevicesDialog(BuildContext context) {
@@ -206,8 +243,9 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
       appBar: AppBar(
         title: const Text('My Devices Screen'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.remove),
+          tooltip: 'Clear Devices',
+          onPressed: _showClearDevicesDialog,
         ),
         actions: [
           IconButton(
@@ -257,7 +295,6 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
                   !connectedDevices.any((c) => c.remoteId == device.remoteId)
                 ).map((device) {
                   final isAvailable = _scanResults.any((r) => r.device.remoteId == device.remoteId);
-
                   return ListTile(
                     title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)'),
                     trailing: Row(
