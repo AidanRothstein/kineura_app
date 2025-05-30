@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -16,8 +16,13 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
 
   BluetoothDevice? connectedDevice;
   BluetoothCharacteristic? notifyChar;
+  BluetoothCharacteristic? writeChar;
+
   List<int> emgData = [];
   String latestValue = "-";
+  int? latestTimestamp;
+
+  bool isRecording = false;
 
   StreamSubscription<List<int>>? notifySubscription;
 
@@ -37,21 +42,15 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         for (BluetoothService service in services) {
           if (service.uuid.toString() == serviceUUID) {
             for (BluetoothCharacteristic c in service.characteristics) {
-              if (c.uuid.toString() == charUUID && c.properties.notify) {
-                notifyChar = c;
-                await notifyChar!.setNotifyValue(true);
-                notifySubscription = notifyChar!.onValueReceived.listen((value) {
-                  final str = utf8.decode(value);
-                  final numVal = int.tryParse(str.trim());
-                  if (numVal != null) {
-                    setState(() {
-                      emgData.add(numVal);
-                      latestValue = numVal.toString();
-                      if (emgData.length > 100) emgData.removeAt(0);
-                    });
-                  }
-                });
-                return;
+              if (c.uuid.toString() == charUUID) {
+                if (c.properties.notify) {
+                  notifyChar = c;
+                  await notifyChar!.setNotifyValue(true);
+                  notifySubscription = notifyChar!.onValueReceived.listen(_handleNotification);
+                }
+                if (c.properties.write) {
+                  writeChar = c;
+                }
               }
             }
           }
@@ -60,6 +59,82 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
     } catch (e) {
       print("⚠️ Error in setupNotifications: $e");
     }
+  }
+
+  void _handleNotification(List<int> value) {
+    if (value.length == 20) {
+      final byteData = ByteData.sublistView(Uint8List.fromList(value));
+      for (int i = 0; i < 10; i++) {
+        int sample = byteData.getInt16(i * 2, Endian.little);
+        emgData.add(sample);
+      }
+      if (emgData.length > 300) {
+        emgData.removeRange(0, emgData.length - 300);
+      }
+
+      setState(() {
+        latestValue = emgData.last.toString();
+      });
+    } else if (value.length == 4) {
+      final byteData = ByteData.sublistView(Uint8List.fromList(value));
+      int timestamp = byteData.getUint32(0, Endian.little);
+      setState(() {
+        latestTimestamp = timestamp;
+      });
+      print("⏱️ Timestamp received: $timestamp ms");
+    }
+  }
+
+  Future<void> _sendBLECommand(String command) async {
+    if (writeChar != null) {
+      await writeChar!.write(command.codeUnits, withoutResponse: false);
+      print("📤 Sent BLE command: $command");
+    }
+  }
+
+  void _toggleRecording() async {
+    if (isRecording) {
+      await _sendBLECommand("stop");
+      setState(() {
+        isRecording = false;
+      });
+      _showSaveDialog();
+    } else {
+      await _sendBLECommand("start");
+      setState(() {
+        isRecording = true;
+      });
+    }
+  }
+
+  void _showSaveDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Save Workout?"),
+        content: const Text("Would you like to save or discard this recording?"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Workout saved!")),
+              );
+            },
+            child: const Text("Save"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Workout discarded.")),
+              );
+            },
+            child: const Text("Discard"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -77,21 +152,22 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text(
-              "Live EMG Data",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
+            const Text("Live EMG Data", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            Text(
-              "Current Value: $latestValue",
-              style: const TextStyle(fontSize: 20),
-            ),
+            Text("Current Value: $latestValue", style: const TextStyle(fontSize: 20)),
+            if (latestTimestamp != null)
+              Text("Timestamp: ${latestTimestamp!} ms", style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 16),
             Expanded(
               child: CustomPaint(
                 painter: EMGPainter(emgData),
                 child: Container(),
               ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _toggleRecording,
+              child: Text(isRecording ? "Stop Recording" : "Start Recording"),
             ),
           ],
         ),
@@ -110,13 +186,16 @@ class EMGPainter extends CustomPainter {
       ..color = Colors.blueAccent
       ..strokeWidth = 2.0;
 
-    if (data.isEmpty) return;
+    if (data.length < 2) return;
 
-    final double scaleY = size.height / 150.0;
+    final double scaleY = size.height / 65536.0;
     final double dx = size.width / (data.length - 1);
+
     for (int i = 0; i < data.length - 1; i++) {
-      final p1 = Offset(i * dx, size.height - data[i] * scaleY);
-      final p2 = Offset((i + 1) * dx, size.height - data[i + 1] * scaleY);
+      final y1 = size.height / 2 - data[i] * scaleY;
+      final y2 = size.height / 2 - data[i + 1] * scaleY;
+      final p1 = Offset(i * dx, y1);
+      final p2 = Offset((i + 1) * dx, y2);
       canvas.drawLine(p1, p2, paint);
     }
   }
