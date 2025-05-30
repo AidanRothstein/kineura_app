@@ -16,9 +16,13 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
 
   BluetoothDevice? connectedDevice;
   BluetoothCharacteristic? notifyChar;
+  BluetoothCharacteristic? writeChar;
+
   List<int> emgData = [];
   String latestValue = "-";
   int? latestTimestamp;
+
+  bool isRecording = false;
 
   StreamSubscription<List<int>>? notifySubscription;
 
@@ -38,11 +42,15 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         for (BluetoothService service in services) {
           if (service.uuid.toString() == serviceUUID) {
             for (BluetoothCharacteristic c in service.characteristics) {
-              if (c.uuid.toString() == charUUID && c.properties.notify) {
-                notifyChar = c;
-                await notifyChar!.setNotifyValue(true);
-                notifySubscription = notifyChar!.onValueReceived.listen(_handleNotification);
-                return;
+              if (c.uuid.toString() == charUUID) {
+                if (c.properties.notify) {
+                  notifyChar = c;
+                  await notifyChar!.setNotifyValue(true);
+                  notifySubscription = notifyChar!.onValueReceived.listen(_handleNotification);
+                }
+                if (c.properties.write) {
+                  writeChar = c;
+                }
               }
             }
           }
@@ -55,13 +63,11 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
 
   void _handleNotification(List<int> value) {
     if (value.length == 20) {
-      // EMG data packet: 10 int16_t values
       final byteData = ByteData.sublistView(Uint8List.fromList(value));
       for (int i = 0; i < 10; i++) {
         int sample = byteData.getInt16(i * 2, Endian.little);
         emgData.add(sample);
       }
-      // Keep only most recent 300 samples (~300ms window at 1kHz)
       if (emgData.length > 300) {
         emgData.removeRange(0, emgData.length - 300);
       }
@@ -70,16 +76,65 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         latestValue = emgData.last.toString();
       });
     } else if (value.length == 4) {
-      // Timestamp packet: 1 uint32_t in ms
       final byteData = ByteData.sublistView(Uint8List.fromList(value));
       int timestamp = byteData.getUint32(0, Endian.little);
       setState(() {
         latestTimestamp = timestamp;
       });
       print("⏱️ Timestamp received: $timestamp ms");
-    } else {
-      print("⚠️ Unknown packet size: ${value.length} bytes");
     }
+  }
+
+  Future<void> _sendBLECommand(String command) async {
+    if (writeChar != null) {
+      await writeChar!.write(command.codeUnits, withoutResponse: false);
+      print("📤 Sent BLE command: $command");
+    }
+  }
+
+  void _toggleRecording() async {
+    if (isRecording) {
+      await _sendBLECommand("stop");
+      setState(() {
+        isRecording = false;
+      });
+      _showSaveDialog();
+    } else {
+      await _sendBLECommand("start");
+      setState(() {
+        isRecording = true;
+      });
+    }
+  }
+
+  void _showSaveDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Save Workout?"),
+        content: const Text("Would you like to save or discard this recording?"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Workout saved!")),
+              );
+            },
+            child: const Text("Save"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Workout discarded.")),
+              );
+            },
+            child: const Text("Discard"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -97,26 +152,22 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text(
-              "Live EMG Data",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
+            const Text("Live EMG Data", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            Text(
-              "Current Value: $latestValue",
-              style: const TextStyle(fontSize: 20),
-            ),
+            Text("Current Value: $latestValue", style: const TextStyle(fontSize: 20)),
             if (latestTimestamp != null)
-              Text(
-                "Timestamp: ${latestTimestamp!} ms",
-                style: const TextStyle(fontSize: 16),
-              ),
+              Text("Timestamp: ${latestTimestamp!} ms", style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 16),
             Expanded(
               child: CustomPaint(
                 painter: EMGPainter(emgData),
                 child: Container(),
               ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _toggleRecording,
+              child: Text(isRecording ? "Stop Recording" : "Start Recording"),
             ),
           ],
         ),
@@ -137,7 +188,7 @@ class EMGPainter extends CustomPainter {
 
     if (data.length < 2) return;
 
-    final double scaleY = size.height / 65536.0; // since range is now full int16
+    final double scaleY = size.height / 65536.0;
     final double dx = size.width / (data.length - 1);
 
     for (int i = 0; i < data.length - 1; i++) {
