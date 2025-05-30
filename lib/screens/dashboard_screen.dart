@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -76,14 +77,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
               actions: [
                 if (selectedDeviceIds.isNotEmpty)
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LiveWorkoutScreen(),
-                        ),
-                      );
+                    onPressed: () async {
+                      const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+                      const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+                      for (var device in connectedDevices) {
+                        if (selectedDeviceIds.contains(device.remoteId.str)) {
+                          try {
+                            if (device.connectionState != BluetoothConnectionState.connected) {
+                              debugPrint("Connecting to ${device.remoteId}...");
+                              await device.connect();
+                            }
+
+                            List<BluetoothService> services = await device.discoverServices();
+                            final service = services.firstWhere(
+                              (s) => s.uuid.toString().toLowerCase() == serviceUuid,
+                              orElse: () => throw Exception("Service not found"),
+                            );
+                            final characteristic = service.characteristics.firstWhere(
+                              (c) => c.uuid.toString().toLowerCase() == characteristicUuid,
+                              orElse: () => throw Exception("Characteristic not found"),
+                            );
+
+                            if (characteristic.properties.write) {
+                              debugPrint("Writing 'start' to ${device.remoteId}...");
+                              await characteristic.write(utf8.encode("start"), withoutResponse: false);
+                              debugPrint("✅ Start command sent to ${device.remoteId}");
+                            } else {
+                              debugPrint("❌ Characteristic not writable on ${device.remoteId}");
+                            }
+                          } catch (e) {
+                            debugPrint("🚫 Failed to send 'start' to ${device.remoteId}: $e");
+                          }
+                        }
+                      }
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LiveWorkoutScreen(),
+                          ),
+                        );
+                      }
                     },
                     child: const Text("Start Workout"),
                   ),
