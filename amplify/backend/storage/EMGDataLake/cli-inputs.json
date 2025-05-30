@@ -1,0 +1,14 @@
+{
+  "resourceName": "EMGDataLake",
+  "policyUUID": "9dfa5ae7",
+  "bucketName": "emg-data-lake",
+  "storageAccess": "auth",
+  "guestAccess": [],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "S3Triggere50cdd9b",
+  "groupAccess": {}
+}

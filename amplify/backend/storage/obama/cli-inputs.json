@@ -1,0 +1,10 @@
+{
+  "resourceName": "obama",
+  "tableName": "testtable",
+  "partitionKey": {
+    "fieldName": "deez",
+    "fieldType": "string"
+  },
+  "gsi": [],
+  "triggerFunctions": []
+}

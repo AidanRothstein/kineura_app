@@ -1,0 +1,68 @@
+type EMGSession @model @auth(rules: [{ allow: owner }]) {
+  sessionId: ID! @primaryKey
+  userId: ID! @index(name: "byUserId")
+  startTime: AWSDateTime!
+  endTime: AWSDateTime
+  status: SessionStatus!
+  deviceInfo: AWSJSON
+  totalBatches: Int
+  totalDataPoints: Int
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type EMGBatch @model @auth(rules: [{ allow: owner }]) {
+  sessionId: ID! @primaryKey(sortKeyFields: ["batchSequence"])
+  batchSequence: Int!
+  userId: ID! @index(name: "byUserId")
+  batchStartTime: AWSDateTime!
+  batchEndTime: AWSDateTime!
+  samplingRate: Int!
+  dataPoints: [EMGDataPoint!]!
+  s3Key: String
+  processed: Boolean
+  createdAt: AWSDateTime!
+}
+
+type EMGDataPoint {
+  timestamp: AWSDateTime!
+  value: Int!
+  sensorId: String!
+  channelId: Int!
+}
+
+enum SessionStatus {
+  RECORDING
+  COMPLETED
+  FAILED
+}
+
+# Remove these manual input types - Amplify auto-generates them
+# input CreateEMGSessionInput { ... }
+# input UpdateEMGSessionInput { ... }
+# input CreateEMGBatchInput { ... }
+# input EMGDataPointInput { ... }
+
+# Remove this manual Mutation type extension - Amplify auto-generates mutations
+type Mutation {
+  processEMGBatch(input: ProcessEMGBatchInput!): EMGBatch
+    @function(name: "emgDataProcessor-${env}")
+    @auth(rules: [{ allow: owner }])
+}
+
+input ProcessEMGBatchInput {
+  sessionId: ID!
+  batchSequence: Int!
+  userId: ID!
+  batchStartTime: AWSDateTime!
+  batchEndTime: AWSDateTime!
+  samplingRate: Int!
+  dataPoints: [EMGDataPointInput!]!
+}
+
+input EMGDataPointInput {
+  timestamp: AWSDateTime!
+  value: Int!
+  sensorId: String!
+  channelId: Int!
+}

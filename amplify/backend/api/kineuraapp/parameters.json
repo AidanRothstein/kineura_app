@@ -1,0 +1,12 @@
+{
+  "AppSyncApiName": "kineuraapp",
+  "DynamoDBBillingMode": "PAY_PER_REQUEST",
+  "DynamoDBEnableServerSideEncryption": false,
+  "AuthCognitoUserPoolId": {
+    "Fn::GetAtt": [
+      "authkineuraapp5632dea0",
+      "Outputs.UserPoolId"
+    ]
+  },
+  "AuthModeLastUpdated": "2025-05-30T19:08:03.180Z"
+}

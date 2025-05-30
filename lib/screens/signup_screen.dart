@@ -24,7 +24,7 @@ class _SignupScreenState extends State<SignupScreen> {
       final password = _passwordController.text.trim();
       final email = _emailController.text.trim();
 
-      final options = CognitoSignUpOptions(
+      final options = SignUpOptions(
         userAttributes: {
           CognitoUserAttributeKey.email: email,
         },

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "serviceConfiguration": {
+    "apiName": "kineuraapp",
+    "serviceName": "AppSync",
+    "defaultAuthType": {
+      "mode": "AMAZON_COGNITO_USER_POOLS",
+      "cognitoUserPoolId": "authkineuraapp5632dea0"
+    },
+    "conflictResolution": {},
+    "additionalAuthTypes": []
+  }
+}

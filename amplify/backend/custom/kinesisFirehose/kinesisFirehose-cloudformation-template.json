@@ -1,0 +1,163 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "{\"createdOn\":\"Windows\",\"createdBy\":\"Amplify\",\"createdWith\":\"13.0.1\",\"stackType\":\"custom-customCloudformation\",\"metadata\":{\"whyContinueWithGen1\":\"\"}}",
+  "Parameters": {
+    "env": {
+      "Type": "String"
+    },
+    "storageemgdatalakeBucketName": {
+      "Type": "String"
+    },
+    "authkineuraapp5632dea0IdentityPoolId": {
+      "Type": "String",
+      "Description": "Input parameter describing IdentityPoolId attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0IdentityPoolName": {
+      "Type": "String",
+      "Description": "Input parameter describing IdentityPoolName attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0UserPoolId": {
+      "Type": "String",
+      "Description": "Input parameter describing UserPoolId attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0UserPoolArn": {
+      "Type": "String",
+      "Description": "Input parameter describing UserPoolArn attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0UserPoolName": {
+      "Type": "String",
+      "Description": "Input parameter describing UserPoolName attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0AppClientIDWeb": {
+      "Type": "String",
+      "Description": "Input parameter describing AppClientIDWeb attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "authkineuraapp5632dea0AppClientID": {
+      "Type": "String",
+      "Description": "Input parameter describing AppClientID attribute for auth/kineuraapp5632dea0 resource"
+    },
+    "apikineuraappGraphQLAPIIdOutput": {
+      "Type": "String",
+      "Description": "Input parameter describing GraphQLAPIIdOutput attribute for api/kineuraapp resource"
+    },
+    "apikineuraappGraphQLAPIEndpointOutput": {
+      "Type": "String",
+      "Description": "Input parameter describing GraphQLAPIEndpointOutput attribute for api/kineuraapp resource"
+    },
+    "storageEMGDataLakeBucketName": {
+      "Type": "String",
+      "Description": "Input parameter describing BucketName attribute for storage/EMGDataLake resource"
+    },
+    "storageEMGDataLakeRegion": {
+      "Type": "String",
+      "Description": "Input parameter describing Region attribute for storage/EMGDataLake resource"
+    }
+  },
+  "Resources": {
+    "EMGDataStream": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "emg-data-stream-${env}"
+        },
+        "ShardCount": 1,
+        "StreamModeDetails": {
+          "StreamMode": "PROVISIONED"
+        }
+      }
+    },
+    "EMGDataFirehose": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {
+          "Fn::Sub": "emg-data-firehose-${env}"
+        },
+        "DeliveryStreamType": "DirectPut",
+        "ExtendedS3DestinationConfiguration": {
+          "BucketARN": {
+            "Fn::Sub": "arn:aws:s3:::${storageemgdatalakeBucketName}"
+          },
+          "RoleARN": {
+            "Fn::GetAtt": [
+              "FirehoseDeliveryRole",
+              "Arn"
+            ]
+          },
+          "Prefix": "emg-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/",
+          "ErrorOutputPrefix": "errors/",
+          "BufferingHints": {
+            "SizeInMBs": 5,
+            "IntervalInSeconds": 300
+          },
+          "CompressionFormat": "GZIP"
+        }
+      }
+    },
+    "FirehoseDeliveryRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "firehose.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "FirehoseDeliveryPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:AbortMultipartUpload",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${storageemgdatalakeBucketName}"
+                    },
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${storageemgdatalakeBucketName}/*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "KinesisStreamName": {
+      "Value": {
+        "Ref": "EMGDataStream"
+      }
+    },
+    "FirehoseDeliveryStreamName": {
+      "Value": {
+        "Ref": "EMGDataFirehose"
+      }
+    },
+    "KinesisStreamArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "EMGDataStream",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

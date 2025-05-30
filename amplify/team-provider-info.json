@@ -14,6 +14,23 @@
     "categories": {
       "auth": {
         "kineuraapp5632dea0": {}
+      },
+      "api": {
+        "kineuraapp": {}
+      },
+      "function": {
+        "emgDataProcessor": {
+          "deploymentBucketName": "amplify-kineuraapp-dev-594cd-deployment",
+          "s3Key": "amplify-builds/emgDataProcessor-503878434a49774c3938-build.zip"
+        },
+        "S3Triggere50cdd9b": {
+          "deploymentBucketName": "amplify-kineuraapp-dev-594cd-deployment",
+          "s3Key": "amplify-builds/S3Triggere50cdd9b-4b2b3168454b67795846-build.zip"
+        }
+      },
+      "storage": {
+        "obama": {},
+        "EMGDataLake": {}
       }
     }
   }

@@ -1,0 +1,8 @@
+{
+  "env": {
+    "Ref": "env"
+  },
+  "storageemgdatalakeBucketName": {
+    "Ref": "storageemgdatalakeBucketName"
+  }
+}
