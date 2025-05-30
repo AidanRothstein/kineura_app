@@ -72,6 +72,8 @@ flutter:
      - assets/K icon.jpg
      - assets/Rothstein-1RM_1622.JPG
      - assets/K_icon-nobg.png
+     - assets/football-bg.jpg
+     - assets/night_fb-bg.jpg
      - assets/fonts/
 
   fonts:
