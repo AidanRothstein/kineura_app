@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import 'menu_screens/learn_screen.dart';
 import 'menu_screens/past_workouts_screen.dart';
 import 'menu_screens/my_devices_screen.dart';
@@ -94,6 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               (s) => s.uuid.toString().toLowerCase() == serviceUuid,
                               orElse: () => throw Exception("Service not found"),
                             );
+
                             final characteristic = service.characteristics.firstWhere(
                               (c) => c.uuid.toString().toLowerCase() == characteristicUuid,
                               orElse: () => throw Exception("Characteristic not found"),
@@ -152,8 +152,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
+        height: 80, // Increased height to prevent overflow
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0), // Added vertical padding
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -181,12 +182,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _navButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(icon: Icon(icon), onPressed: onTap),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+    return Expanded( // Wrap with Expanded to prevent overflow
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 24), // Slightly reduced icon size
+              const SizedBox(height: 2), // Reduced spacing
+              Flexible( // Allow text to be flexible
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 11), // Reduced font size
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis, // Handle text overflow
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
