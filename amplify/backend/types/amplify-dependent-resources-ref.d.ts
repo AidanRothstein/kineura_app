@@ -1,6 +1,12 @@
 export type AmplifyDependentResourcesAttributes = {
+  "api": {
+    "kineuraapp": {
+      "GraphQLAPIEndpointOutput": "string",
+      "GraphQLAPIIdOutput": "string"
+    }
+  },
   "auth": {
-    "kineuraapp5632dea0": {
+    "kineuraappd715a79d": {
       "AppClientID": "string",
       "AppClientIDWeb": "string",
       "IdentityPoolId": "string",
@@ -8,6 +14,12 @@ export type AmplifyDependentResourcesAttributes = {
       "UserPoolArn": "string",
       "UserPoolId": "string",
       "UserPoolName": "string"
+    }
+  },
+  "storage": {
+    "emgdata": {
+      "BucketName": "string",
+      "Region": "string"
     }
   }
 }

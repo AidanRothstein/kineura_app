@@ -1,10 +1,10 @@
 {
   "version": "1",
   "cognitoConfig": {
-    "identityPoolName": "kineuraapp5632dea0_identitypool_5632dea0",
+    "identityPoolName": "kineuraappd715a79d_identitypool_d715a79d",
     "allowUnauthenticatedIdentities": false,
-    "resourceNameTruncated": "kineur5632dea0",
-    "userPoolName": "kineuraapp5632dea0_userpool_5632dea0",
+    "resourceNameTruncated": "kineurd715a79d",
+    "userPoolName": "kineuraappd715a79d_userpool_d715a79d",
     "autoVerifiedAttributes": [
       "email"
     ],
@@ -31,14 +31,14 @@
     "userpoolClientReadAttributes": [
       "email"
     ],
-    "userpoolClientLambdaRole": "kineur5632dea0_userpoolclient_lambda_role",
+    "userpoolClientLambdaRole": "kineurd715a79d_userpoolclient_lambda_role",
     "userpoolClientSetAttributes": false,
-    "sharedId": "5632dea0",
-    "resourceName": "kineuraapp5632dea0",
+    "sharedId": "d715a79d",
+    "resourceName": "kineuraappd715a79d",
     "authSelections": "identityPoolAndUserPool",
     "useDefault": "default",
     "usernameAttributes": [
-      "email, phone_number"
+      "email"
     ],
     "userPoolGroupList": [],
     "serviceName": "Cognito",

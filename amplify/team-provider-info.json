@@ -1,19 +1,25 @@
 {
   "dev": {
     "awscloudformation": {
-      "AuthRoleName": "amplify-kineuraapp-dev-594cd-authRole",
-      "UnauthRoleArn": "arn:aws:iam::104907334960:role/amplify-kineuraapp-dev-594cd-unauthRole",
-      "AuthRoleArn": "arn:aws:iam::104907334960:role/amplify-kineuraapp-dev-594cd-authRole",
+      "AuthRoleName": "amplify-kineuraapp-dev-f83de-authRole",
+      "UnauthRoleArn": "arn:aws:iam::104907334960:role/amplify-kineuraapp-dev-f83de-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::104907334960:role/amplify-kineuraapp-dev-f83de-authRole",
       "Region": "us-east-1",
-      "DeploymentBucketName": "amplify-kineuraapp-dev-594cd-deployment",
-      "UnauthRoleName": "amplify-kineuraapp-dev-594cd-unauthRole",
-      "StackName": "amplify-kineuraapp-dev-594cd",
-      "StackId": "arn:aws:cloudformation:us-east-1:104907334960:stack/amplify-kineuraapp-dev-594cd/b437fcf0-39b4-11f0-bc4f-12e01eaed637",
-      "AmplifyAppId": "d1wyrrr9raeb2y"
+      "DeploymentBucketName": "amplify-kineuraapp-dev-f83de-deployment",
+      "UnauthRoleName": "amplify-kineuraapp-dev-f83de-unauthRole",
+      "StackName": "amplify-kineuraapp-dev-f83de",
+      "StackId": "arn:aws:cloudformation:us-east-1:104907334960:stack/amplify-kineuraapp-dev-f83de/390b8ef0-3fd8-11f0-933c-0affed17c77f",
+      "AmplifyAppId": "d1jadptidfk0tv"
     },
     "categories": {
       "auth": {
-        "kineuraapp5632dea0": {}
+        "kineuraappd715a79d": {}
+      },
+      "api": {
+        "kineuraapp": {}
+      },
+      "storage": {
+        "emgdata": {}
       }
     }
   }

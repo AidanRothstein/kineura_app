@@ -35,6 +35,10 @@ dependencies:
   amplify_flutter: ^1.6.2
   amplify_auth_cognito: ^1.6.2
   shared_preferences: ^2.2.2
+  amplify_api: ^1.6.2          # ✅ For GraphQL / DynamoDB
+  amplify_storage_s3: ^1.6.2   # ✅ For S3 file upload/download
+  path_provider: ^2.1.2
+
  
 
   # The following adds the Cupertino Icons font to your application.

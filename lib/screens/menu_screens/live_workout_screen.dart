@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:amplify_storage_s3/amplify_storage_s3.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 
 class LiveWorkoutScreen extends StatefulWidget {
   const LiveWorkoutScreen({super.key});
@@ -21,8 +25,11 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   List<int> emgData = [];
   String latestValue = "-";
   int? latestTimestamp;
+  int? startTimestamp;
 
   bool isRecording = false;
+  File? tempFile;
+  IOSink? tempSink;
 
   StreamSubscription<List<int>>? notifySubscription;
 
@@ -67,43 +74,49 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
       for (int i = 0; i < 10; i++) {
         int sample = byteData.getInt16(i * 2, Endian.little);
         emgData.add(sample);
+        if (isRecording && tempSink != null) {
+          tempSink!.writeln(sample);
+        }
       }
       if (emgData.length > 300) {
         emgData.removeRange(0, emgData.length - 300);
       }
-
       setState(() {
         latestValue = emgData.last.toString();
       });
     } else if (value.length == 4) {
       final byteData = ByteData.sublistView(Uint8List.fromList(value));
       int timestamp = byteData.getUint32(0, Endian.little);
+      if (isRecording && startTimestamp == null) {
+        startTimestamp = timestamp;
+      }
       setState(() {
         latestTimestamp = timestamp;
       });
-      print("⏱️ Timestamp received: $timestamp ms");
     }
   }
 
   Future<void> _sendBLECommand(String command) async {
     if (writeChar != null) {
       await writeChar!.write(command.codeUnits, withoutResponse: false);
-      print("📤 Sent BLE command: $command");
     }
   }
 
   void _toggleRecording() async {
     if (isRecording) {
       await _sendBLECommand("stop");
-      setState(() {
-        isRecording = false;
-      });
+      setState(() => isRecording = false);
+      await tempSink?.flush();
+      await tempSink?.close();
       _showSaveDialog();
     } else {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/emg_${DateTime.now().millisecondsSinceEpoch}.csv');
+      tempFile = file;
+      tempSink = file.openWrite();
+      startTimestamp = null;
       await _sendBLECommand("start");
-      setState(() {
-        isRecording = true;
-      });
+      setState(() => isRecording = true);
     }
   }
 
@@ -115,21 +128,11 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         content: const Text("Would you like to save or discard this recording?"),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Workout saved!")),
-              );
-            },
+            onPressed: _saveWorkout,
             child: const Text("Save"),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Workout discarded.")),
-              );
-            },
+            onPressed: _confirmDiscard,
             child: const Text("Discard"),
           ),
         ],
@@ -137,10 +140,93 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
     );
   }
 
+  void _confirmDiscard() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Are you sure?"),
+        content: const Text("This will delete the recorded EMG data permanently."),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await tempFile?.delete();
+              Navigator.of(context).pop();
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Workout discarded.")),
+              );
+            },
+            child: const Text("Yes, Discard"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Cancel"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveWorkout() async {
+    Navigator.of(context).pop();
+    if (tempFile == null || startTimestamp == null || latestTimestamp == null) return;
+
+    try {
+      final user = await Amplify.Auth.getCurrentUser();
+      final userId = user.userId;
+
+      final duration = ((latestTimestamp! - startTimestamp!) / 1000).round();
+      final key = 'emg/$userId/${DateTime.now().toIso8601String()}.csv';
+
+      final operation = Amplify.Storage.uploadFile(
+        localFile: AWSFile.fromPath(tempFile!.path),
+        key: key,
+        options: StorageUploadFileOptions(
+          accessLevel: StorageAccessLevel.protected,
+        ),
+      );
+      final result = await operation.result;
+      final uploadedKey = result.uploadedItem.key;
+
+      final nowIso = DateTime.now().toIso8601String().split('.').first + 'Z';
+
+      final mutation = '''
+        mutation CreateSession {
+          createSession(input: {
+            userID: "$userId",
+            timestamp: "$nowIso",
+            durationSeconds: $duration,
+            emgS3Key: "$uploadedKey",
+            imuS3Key: null,
+            workoutType: "Default",
+            notes: ""
+          }) {
+            id
+          }
+        }
+      ''';
+
+      final request = GraphQLRequest<String>(document: mutation);
+      final response = await Amplify.API.mutate(request: request).response;
+      print("Mutation response: \${response.data}");
+      print("Mutation errors: \${response.errors}");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Workout saved!")),
+      );
+    } catch (e) {
+      print("⚠️ Upload or mutation error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving workout: $e")),
+      );
+    }
+  }
+
   @override
   void dispose() {
     notifySubscription?.cancel();
     notifyChar?.setNotifyValue(false);
+    tempSink?.close();
     super.dispose();
   }
 
@@ -156,7 +242,7 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
             const SizedBox(height: 16),
             Text("Current Value: $latestValue", style: const TextStyle(fontSize: 20)),
             if (latestTimestamp != null)
-              Text("Timestamp: ${latestTimestamp!} ms", style: const TextStyle(fontSize: 16)),
+              Text("Timestamp: \${latestTimestamp!} ms", style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 16),
             Expanded(
               child: CustomPaint(

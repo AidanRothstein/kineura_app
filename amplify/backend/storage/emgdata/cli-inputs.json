@@ -1,0 +1,14 @@
+{
+  "resourceName": "emgdata",
+  "policyUUID": "843a0994",
+  "bucketName": "emgdata-kineura",
+  "storageAccess": "auth",
+  "guestAccess": [],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE",
+  "groupAccess": {}
+}

@@ -17,6 +17,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.8"
+  amplify_api:
+    dependency: "direct main"
+    description:
+      name: amplify_api
+      sha256: e7532c3db42a69bae833c9912b6ad10eaf2f1c7e6e7d4a25c71fbbc6b141f9aa
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.8.0"
+  amplify_api_dart:
+    dependency: transitive
+    description:
+      name: amplify_api_dart
+      sha256: "669babe2a5a945950f1870090fa0c66e48163b1c54ebf26d9591a63afeabf785"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.1"
   amplify_auth_cognito:
     dependency: "direct main"
     description:
@@ -81,6 +97,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.4.4"
+  amplify_storage_s3:
+    dependency: "direct main"
+    description:
+      name: amplify_storage_s3
+      sha256: c5ef2e61ea6411449678728622ba9c95bf2b19426181403d4bee79247d5fe562
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.8.0"
+  amplify_storage_s3_dart:
+    dependency: transitive
+    description:
+      name: amplify_storage_s3_dart
+      sha256: c3c5b032a8bab0d9415e5c536fb54d79c71114953ad41c46d98de939f6d296bf
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.11"
   ansi_styles:
     dependency: transitive
     description:
@@ -201,6 +233,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  connectivity_plus:
+    dependency: transitive
+    description:
+      name: connectivity_plus
+      sha256: "051849e2bd7c7b3bc5844ea0d096609ddc3a859890ec3a9ac4a65a2620cc1f99"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.4"
+  connectivity_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: connectivity_plus_platform_interface
+      sha256: "42657c1715d48b167930d5f34d00222ac100475f73d10162ddf43e714932f204"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.1"
   conventional_commit:
     dependency: transitive
     description:
@@ -536,6 +584,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  nm:
+    dependency: transitive
+    description:
+      name: nm
+      sha256: "2c9aae4127bdc8993206464fcc063611e0e36e72018696cd9631023a31b24254"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.0"
   oauth2:
     dependency: transitive
     description:
@@ -577,7 +633,7 @@ packages:
     source: hosted
     version: "1.9.1"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
@@ -981,6 +1037,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.5.1"
+  web_socket_channel:
+    dependency: transitive
+    description:
+      name: web_socket_channel
+      sha256: "58c6666b342a38816b2e7e50ed0f1e261959630becd4c879c4f26bfa14aa5a42"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.5"
   win32:
     dependency: transitive
     description:
