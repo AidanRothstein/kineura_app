@@ -14,3 +14,21 @@ type Session
   workoutType: String
   notes: String
 }
+type Article @model
+  @auth(rules: [
+    { allow: groups, groups: ["Editors"], operations: [create, update, delete] }
+    { allow: public, operations: [read] }
+  ]) {
+  id: ID!
+  title: String!
+  content: String!
+  author: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+  imageUrl: String
+  summary: String
+  tags: [String!]!
+  readTime: Int!
+  isPublished: Boolean!
+}
+
