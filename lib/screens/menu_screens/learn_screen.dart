@@ -4,8 +4,30 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../models/article.dart';
 import '../../providers/article_providers.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'article_detail_screen.dart';
 import 'article_upload_screen.dart';
+import 'dart:convert';
+
+Future<bool> isUserEditor() async {
+  try {
+    final session = await Amplify.Auth.fetchAuthSession() as CognitoAuthSession;
+    if (session.isSignedIn) {
+      final accessToken = session.userPoolTokensResult.value.accessToken.raw;
+      final parts = accessToken.split('.');
+      if (parts.length != 3) return false;
+      final payloadMap = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
+      ) as Map<String, dynamic>;
+      final groups = payloadMap['cognito:groups'] as List<dynamic>? ?? [];
+      return groups.contains('Editors');
+    }
+  } catch (e) {
+    safePrint("Error checking user group: $e");
+  }
+  return false;
+}
 
 class LearnScreen extends ConsumerStatefulWidget {
   const LearnScreen({super.key});
@@ -16,11 +38,18 @@ class LearnScreen extends ConsumerStatefulWidget {
 
 class _LearnScreenState extends ConsumerState<LearnScreen> {
   final TextEditingController _searchController = TextEditingController();
+  late Future<bool> _canUpload;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _canUpload = isUserEditor();
   }
 
   @override
@@ -38,15 +67,26 @@ class _LearnScreenState extends ConsumerState<LearnScreen> {
         ),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ArticleUploadScreen(),
-                ),
-              );
+          FutureBuilder<bool>(
+            future: _canUpload,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Container();
+              }
+              if (snapshot.data == true) {
+                return IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ArticleUploadScreen(),
+                      ),
+                    );
+                  },
+                );
+              }
+              return Container();
             },
           ),
         ],
@@ -265,46 +305,61 @@ class ArticleCard extends StatelessWidget {
                   // Meta information
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.person,
                         size: 16,
-                        color: Colors.grey[500],
+                        color: Colors.grey,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        article.author,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
+                      Flexible(
+                        fit: FlexFit.tight,
+                        child: Text(
+                          article.author,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 16),
-                      Icon(
+                      const Icon(
                         Icons.access_time,
                         size: 16,
-                        color: Colors.grey[500],
+                        color: Colors.grey,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        DateFormat('MMM dd, yyyy').format(article.createdAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
+                      Flexible(
+                        fit: FlexFit.tight,
+                        child: Text(
+                          DateFormat('MMM dd, yyyy').format(article.createdAt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (article.readTime > 0) ...[
                         const SizedBox(width: 16),
-                        Icon(
+                        const Icon(
                           Icons.schedule,
                           size: 16,
-                          color: Colors.grey[500],
+                          color: Colors.grey,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          '${article.readTime} min read',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                        Flexible(
+                          fit: FlexFit.tight,
+                          child: Text(
+                            '${article.readTime} min read',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
