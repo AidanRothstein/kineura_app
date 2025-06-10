@@ -15,6 +15,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   
   // User data
   String _username = '';
+  String _name = '';
   String _email = '';
   bool _isLoading = true;
   String _errorMessage = '';
@@ -147,6 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       // Get current user
       final user = await Amplify.Auth.getCurrentUser();
       _username = user.username;
+      
 
       // Fetch user attributes
       final attributes = await Amplify.Auth.fetchUserAttributes();
@@ -154,6 +156,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         if (attribute.userAttributeKey == CognitoUserAttributeKey.email) {
           _email = attribute.value;
         }
+        if (attribute.userAttributeKey == CognitoUserAttributeKey.name) {
+          _name = attribute.value;
+        }
+        
       }
 
       setState(() {
@@ -288,9 +294,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                   const SizedBox(height: spacingM),
-                  // Username
+                  // Name
                   Text(
-                    _username.isNotEmpty ? _username : 'Loading...',
+                    _name.isNotEmpty ? _name : 'Loading...',
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,

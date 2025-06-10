@@ -15,11 +15,11 @@
       "auth": {
         "kineuraappd715a79d": {}
       },
-      "api": {
-        "kineuraapp": {}
-      },
       "storage": {
         "emgdata": {}
+      },
+      "api": {
+        "kineuraapp": {}
       }
     }
   }

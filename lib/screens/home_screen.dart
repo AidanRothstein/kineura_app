@@ -3,6 +3,29 @@ import 'dart:ui';
 import 'signup_screen.dart';
 import 'signin_screen.dart';
 
+import 'package:amplify_flutter/amplify_flutter.dart';
+
+import 'dashboard_screen.dart';
+
+Future<void> _signedIn(BuildContext context) async {
+  final session = await Amplify.Auth.fetchAuthSession();
+  if (session.isSignedIn) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You are already signed in.')),
+    );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+    );
+    return;
+  }
+  else{
+    return;
+  }
+}
+
+
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -242,6 +265,9 @@ class _HomeScreenState extends State<HomeScreen>
         child: InkWell(
           borderRadius: BorderRadius.circular(borderRadius),
           onTap: () {
+            _signedIn(context);
+
+
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const SigninScreen()),
