@@ -1,25 +1,21 @@
-# This "input" configures a global authorization rule to enable public access to
-# all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/cli/graphql/authorization-rules
-input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
-
-type Session
-  @model
-  @auth(rules: [{ allow: owner, ownerField: "userID" }]) {
+type Session @model
+  @auth(rules: [
+    { allow: owner },                         # App users (Cognito)
+    { allow: private, provider: iam }         # Lambda or backend (IAM)
+    { allow: public, provider: apiKey, operations: [create] }  # 👈 Allow Lambda via API key
+  ]) {
   id: ID!
-  userID: ID! @index(name: "byUser", sortKeyFields: ["timestamp"])
+  userID: String!
+  owner: String!          # ★ add this line
   timestamp: AWSDateTime!
   durationSeconds: Int
-  emgS3Key: String!
+  emgS3Key: String
+  emgProcessedS3Key: String
   imuS3Key: String
   workoutType: String
   notes: String
-
-  # Processed EMG data
-  emgProcessedS3Key: String
-
-  # EMG metrics
-  averageRMS: Float
   peakRMS: Float
+  averageRMS: Float
   fatigueIndex: Float
   elasticityIndex: Float
   activationRatio: Float
@@ -28,6 +24,8 @@ type Session
   signalToNoiseRatio: Float
   baselineDrift: Float
   zeroCrossingRate: Float
+
+   # 🚀 Add these:
   rateOfRise: Float
   rateOfFall: Float
   rfdAnalog: Float

@@ -6,7 +6,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_storage_s3/amplify_storage_s3.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:csv/csv.dart'; // ✅ Make sure to add this to pubspec.yaml: csv: ^5.0.0
+import 'package:csv/csv.dart';
+import 'dart:convert';
+
 
 class WorkoutDetailScreen extends StatefulWidget {
   final Map<String, dynamic> sessionData;
@@ -29,7 +31,18 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     });
 
     try {
-      final s3Key = widget.sessionData['emgProcessedS3Key'];
+      print("DEBUG: sessionData = ${jsonEncode(widget.sessionData)}");
+
+      final s3Key = widget.sessionData['emgProcessedS3Key'] ?? widget.sessionData['emgS3Key'];
+
+      if (s3Key == null || s3Key is! String || s3Key.isEmpty) {
+        setState(() {
+          _error = 'No valid S3 key found for this session.';
+          _loading = false;
+        });
+        return;
+      }
+
       final tempDir = await getTemporaryDirectory();
       final localPath = '${tempDir.path}/processed.csv';
 
@@ -48,9 +61,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       final filtered = <FlSpot>[];
       final rms = <FlSpot>[];
       for (var i = 1; i < rows.length; i++) {
-        final t = i / 1000.0;
-        filtered.add(FlSpot(t, double.tryParse(rows[i][0].toString()) ?? 0));
-        rms.add(FlSpot(t, double.tryParse(rows[i][1].toString()) ?? 0));
+        final t = double.tryParse(rows[i][0].toString()) ?? (i - 1) / 1000.0;
+        final fVal = double.tryParse(rows[i][1].toString()) ?? 0;
+        final rVal = rows.length > 2 ? double.tryParse(rows[i][2].toString()) : null;
+
+        filtered.add(FlSpot(t, fVal));
+        if (rVal != null) {
+          rms.add(FlSpot(t, rVal));
+        }
       }
 
       setState(() {
@@ -68,7 +86,31 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Widget _buildChart() {
-    if (_filteredSpots.isEmpty || _rmsSpots.isEmpty) return const Text('No EMG data loaded yet.');
+    if (_filteredSpots.isEmpty) return const Text('No EMG data loaded yet.');
+
+    final lineBars = [
+      LineChartBarData(
+        spots: _filteredSpots,
+        isCurved: false,
+        dotData: FlDotData(show: false),
+        belowBarData: BarAreaData(show: false),
+        color: Colors.blue,
+        barWidth: 1.5,
+      ),
+    ];
+
+    if (_rmsSpots.isNotEmpty) {
+      lineBars.add(
+        LineChartBarData(
+          spots: _rmsSpots,
+          isCurved: false,
+          dotData: FlDotData(show: false),
+          belowBarData: BarAreaData(show: false),
+          color: Colors.orange,
+          barWidth: 1.5,
+        ),
+      );
+    }
 
     return SizedBox(
       height: 300,
@@ -76,24 +118,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         LineChartData(
           minX: _filteredSpots.first.x,
           maxX: _filteredSpots.last.x,
-          lineBarsData: [
-            LineChartBarData(
-              spots: _filteredSpots,
-              isCurved: false,
-              dotData: FlDotData(show: false),
-              belowBarData: BarAreaData(show: false),
-              color: Colors.blue,
-              barWidth: 1.5,
-            ),
-            LineChartBarData(
-              spots: _rmsSpots,
-              isCurved: false,
-              dotData: FlDotData(show: false),
-              belowBarData: BarAreaData(show: false),
-              color: Colors.orange,
-              barWidth: 1.5,
-            )
-          ],
+          lineBarsData: lineBars,
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
@@ -126,10 +151,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         DataColumn(label: Text('Value')),
       ],
       rows: metrics.map((key) {
-        final value = widget.sessionData[key]?.toStringAsFixed(4) ?? 'N/A';
+        final value = widget.sessionData[key];
+        final display = value is num ? value.toStringAsFixed(4) : 'N/A';
         return DataRow(cells: [
           DataCell(Text(key)),
-          DataCell(Text(value)),
+          DataCell(Text(display)),
         ]);
       }).toList(),
     );

@@ -20,6 +20,9 @@
                 "description": "article key"
               },
               "authenticationType": "API_KEY"
+            },
+            {
+              "authenticationType": "AWS_IAM"
             }
           ],
           "defaultAuthentication": {
