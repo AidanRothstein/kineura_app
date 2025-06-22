@@ -13,7 +13,31 @@ type Session
   imuS3Key: String
   workoutType: String
   notes: String
+
+  # Processed EMG data
+  emgProcessedS3Key: String
+
+  # EMG metrics
+  averageRMS: Float
+  peakRMS: Float
+  fatigueIndex: Float
+  elasticityIndex: Float
+  activationRatio: Float
+  medianFrequency: Float
+  meanFrequency: Float
+  signalToNoiseRatio: Float
+  baselineDrift: Float
+  zeroCrossingRate: Float
+  rateOfRise: Float
+  rateOfFall: Float
+  rfdAnalog: Float
+  snrTimeRaw: Float
+  snrTimeDenoised: Float
+  snrFreqRaw: Float
+  snrFreqDenoised: Float
 }
+
+
 type Article @model
   @auth(rules: [
     { allow: public, operations: [read] }
@@ -31,4 +55,3 @@ type Article @model
   readTime: Int!
   isPublished: Boolean!
 }
-
