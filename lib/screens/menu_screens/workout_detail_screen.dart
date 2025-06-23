@@ -46,7 +46,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       final match = RegExp(r'^[^/]+/[^/]+/(.*)').firstMatch(rawKey);
       final logicalKey = match != null ? match.group(1)! : rawKey;
 
-      final tempDir = await getTemporaryDirectory();
+      final tempDir = await getApplicationDocumentsDirectory();
+
       final localPath = '${tempDir.path}/processed.csv';
 
       await Amplify.Storage.downloadFile(
