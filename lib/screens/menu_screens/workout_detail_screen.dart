@@ -9,7 +9,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 
-
 class WorkoutDetailScreen extends StatefulWidget {
   final Map<String, dynamic> sessionData;
   const WorkoutDetailScreen({super.key, required this.sessionData});
@@ -33,9 +32,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     try {
       print("DEBUG: sessionData = ${jsonEncode(widget.sessionData)}");
 
-      final s3Key = widget.sessionData['emgProcessedS3Key'] ?? widget.sessionData['emgS3Key'];
+      final rawKey = widget.sessionData['emgProcessedS3Key'] ??
+          widget.sessionData['emgS3Key'];
 
-      if (s3Key == null || s3Key is! String || s3Key.isEmpty) {
+      if (rawKey == null || rawKey is! String || rawKey.isEmpty) {
         setState(() {
           _error = 'No valid S3 key found for this session.';
           _loading = false;
@@ -43,11 +43,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         return;
       }
 
+      final match = RegExp(r'^[^/]+/[^/]+/(.*)').firstMatch(rawKey);
+      final logicalKey = match != null ? match.group(1)! : rawKey;
+
       final tempDir = await getTemporaryDirectory();
       final localPath = '${tempDir.path}/processed.csv';
 
       await Amplify.Storage.downloadFile(
-        key: s3Key,
+        key: logicalKey,
         localFile: AWSFile.fromPath(localPath),
         options: const StorageDownloadFileOptions(
           accessLevel: StorageAccessLevel.protected,
@@ -56,17 +59,24 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
       final file = File(localPath);
       final csvStr = await file.readAsString();
-      final rows = const CsvToListConverter().convert(csvStr);
+
+      final rawRows = const CsvToListConverter(
+        eol: '\n',
+        shouldParseNumbers: false,
+      ).convert(csvStr);
+      final rows = rawRows.skip(1).toList();
 
       final filtered = <FlSpot>[];
       final rms = <FlSpot>[];
-      for (var i = 1; i < rows.length; i++) {
-        final t = double.tryParse(rows[i][0].toString()) ?? (i - 1) / 1000.0;
-        final fVal = double.tryParse(rows[i][1].toString()) ?? 0;
-        final rVal = rows.length > 2 ? double.tryParse(rows[i][2].toString()) : null;
+      for (var i = 0; i < rows.length; i++) {
+        final t = double.tryParse(rows[i][0].toString()) ?? (i / 1000.0);
+        final fVal = double.tryParse(rows[i][1].toString());
+        final rVal = rows[i].length > 2 ? double.tryParse(rows[i][2].toString()) : null;
 
-        filtered.add(FlSpot(t, fVal));
-        if (rVal != null) {
+        if (fVal != null && fVal.isFinite) {
+          filtered.add(FlSpot(t, fVal));
+        }
+        if (rVal != null && rVal.isFinite) {
           rms.add(FlSpot(t, rVal));
         }
       }
@@ -86,7 +96,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Widget _buildChart() {
-    if (_filteredSpots.isEmpty) return const Text('No EMG data loaded yet.');
+    if (_filteredSpots.length < 2) {
+      return const Text('Not enough EMG data to show graph.');
+    }
+
+    final minX = _filteredSpots.map((e) => e.x).reduce(min);
+    final maxX = _filteredSpots.map((e) => e.x).reduce(max);
+    final minY = [..._filteredSpots, ..._rmsSpots].map((e) => e.y).reduce(min);
+    final maxY = [..._filteredSpots, ..._rmsSpots].map((e) => e.y).reduce(max);
 
     final lineBars = [
       LineChartBarData(
@@ -97,52 +114,92 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         color: Colors.blue,
         barWidth: 1.5,
       ),
+      LineChartBarData(
+        spots: _rmsSpots,
+        isCurved: false,
+        dotData: FlDotData(show: false),
+        belowBarData: BarAreaData(show: false),
+        color: Colors.orange,
+        barWidth: 1.5,
+      ),
     ];
 
-    if (_rmsSpots.isNotEmpty) {
-      lineBars.add(
-        LineChartBarData(
-          spots: _rmsSpots,
-          isCurved: false,
-          dotData: FlDotData(show: false),
-          belowBarData: BarAreaData(show: false),
-          color: Colors.orange,
-          barWidth: 1.5,
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 300,
-      child: LineChart(
-        LineChartData(
-          minX: _filteredSpots.first.x,
-          maxX: _filteredSpots.last.x,
-          lineBarsData: lineBars,
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 0.5,
-                getTitlesWidget: (value, _) => Text('${value.toStringAsFixed(1)}s'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 300,
+          child: LineChart(
+            LineChartData(
+              minX: minX,
+              maxX: maxX,
+              minY: minY,
+              maxY: maxY,
+              lineBarsData: lineBars,
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 32,
+                    interval: ((maxX - minX) / 6).clamp(0.1, double.infinity),
+                    getTitlesWidget: (value, _) => Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('${value.toStringAsFixed(1)}s',
+                          style: const TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: ((maxY - minY) / 6).clamp(1.0, double.infinity),
+                    getTitlesWidget: (value, _) => Text(
+                      value.toStringAsFixed(0),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true),
+              gridData: FlGridData(show: true),
+              borderData: FlBorderData(show: true),
             ),
           ),
-          gridData: FlGridData(show: true),
-          borderData: FlBorderData(show: true),
         ),
-      ),
+        const SizedBox(height: 8),
+        Row(
+          children: const [
+            Icon(Icons.square, color: Colors.blue, size: 12),
+            SizedBox(width: 4),
+            Text('Filtered EMG'),
+            SizedBox(width: 12),
+            Icon(Icons.square, color: Colors.orange, size: 12),
+            SizedBox(width: 4),
+            Text('RMS Envelope'),
+          ],
+        )
+      ],
     );
   }
 
   Widget _buildMetricsTable() {
     final metrics = [
-      'peakRMS', 'averageRMS', 'fatigueIndex', 'elasticityIndex',
-      'activationRatio', 'medianFrequency', 'meanFrequency',
-      'signalToNoiseRatio', 'baselineDrift', 'zeroCrossingRate'
+      'peakRMS',
+      'averageRMS',
+      'fatigueIndex',
+      'elasticityIndex',
+      'activationRatio',
+      'medianFrequency',
+      'meanFrequency',
+      'signalToNoiseRatio',
+      'baselineDrift',
+      'zeroCrossingRate'
     ];
 
     return DataTable(
