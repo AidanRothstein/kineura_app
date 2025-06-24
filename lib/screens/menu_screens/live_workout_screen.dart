@@ -1,3 +1,4 @@
+// ... all your existing imports ...
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -9,13 +10,11 @@ import 'package:amplify_flutter/amplify_flutter.dart';
 
 class LiveWorkoutScreen extends StatefulWidget {
   const LiveWorkoutScreen({super.key});
-
   @override
   State<LiveWorkoutScreen> createState() => _LiveWorkoutScreenState();
 }
 
 class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
-  // Updated UUIDs to match ESP32
   final String serviceUUID = "df1a0863-f02f-49ba-bf55-3b56c6bcb398";
   final String charUUID = "8c24159c-66a0-4340-8b55-465047ce37ce";
 
@@ -23,9 +22,10 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   BluetoothCharacteristic? notifyChar;
   BluetoothCharacteristic? writeChar;
 
-  List<int> emgData = [];
-  List<int> syncedEmgData = []; // Store synced data separately
-  List<int> newSamples = [];
+  int numChannels = 1;
+  List<List<int>> multiChannelEmgData = [];
+  List<List<int>> multiChannelNewSamples = [];
+
   String latestValue = "-";
   int? latestTimestamp;
   int? startTimestamp;
@@ -67,16 +67,12 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   Future<void> _attemptReconnection() async {
     if (isConnected) return;
     try {
-      setState(() {
-        connectionStatus = "Reconnecting...";
-      });
+      setState(() => connectionStatus = "Reconnecting...");
       await _cleanupConnection();
       await Future.delayed(const Duration(seconds: 1));
       await _setupNotifications();
     } catch (e) {
-      setState(() {
-        connectionStatus = "Reconnection Failed";
-      });
+      setState(() => connectionStatus = "Reconnection Failed");
     }
   }
 
@@ -185,32 +181,61 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   }
 
   void _handleNotification(List<int> value) {
-    if (value.length == 20) {
-      final byteData = ByteData.sublistView(Uint8List.fromList(value));
-      for (int i = 0; i < 10; i++) {
-        int sample = byteData.getInt16(i * 2, Endian.little);
-        newSamples.add(sample);
-        emgData.add(sample);
-      }
-      if (newSamples.length > 300) {
-        newSamples.removeRange(0, newSamples.length - 300);
-      }
-      setState(() => latestValue = newSamples.last.toString());
-    } else if (value.length == 4) {
-      final byteData = ByteData.sublistView(Uint8List.fromList(value));
-      int timestamp = byteData.getUint32(0, Endian.little);
-      if (isRecording && startTimestamp == null) startTimestamp = timestamp;
-      setState(() => latestTimestamp = timestamp);
+  try {
+    final decoded = String.fromCharCodes(value);
+    if (decoded.startsWith("meta,numChannels=")) {
+      numChannels = int.parse(decoded.split("=")[1]);
+      debugPrint("Set numChannels = $numChannels");
+      return;
     }
+  } catch (_) {}
+
+  // Handle 4-byte timestamp packet
+  if (value.length == 4) {
+    final byteData = ByteData.sublistView(Uint8List.fromList(value));
+    latestTimestamp = byteData.getUint32(0, Endian.little);
+    if (isRecording && startTimestamp == null) {
+      startTimestamp = latestTimestamp;
+    }
+    return;
   }
 
-  // ------------------- ONLY CHANGE: popup on stop --------------------------
+  // If we haven't received a timestamp yet, drop this data
+  if (latestTimestamp == null) return;
+
+  // Handle EMG sample packet
+  int bytesPerSample = numChannels * 2;
+  if (value.length % bytesPerSample != 0) return;
+
+  final byteData = ByteData.sublistView(Uint8List.fromList(value));
+  int numSamples = value.length ~/ bytesPerSample;
+
+  for (int i = 0; i < numSamples; i++) {
+    List<int> row = [latestTimestamp! + i];
+    for (int ch = 0; ch < numChannels; ch++) {
+      int offset = i * bytesPerSample + ch * 2;
+      row.add(byteData.getInt16(offset, Endian.little));
+    }
+    multiChannelEmgData.add(row);
+    multiChannelNewSamples.add(row);
+  }
+
+  while (multiChannelNewSamples.length > 300) {
+    multiChannelNewSamples.removeAt(0);
+  }
+
+  setState(() => latestValue = multiChannelNewSamples.last[1].toString());
+
+  // After assigning timestamps to this packet, bump latestTimestamp
+  latestTimestamp = latestTimestamp! + numSamples;
+}
+
+
+
   void _toggleRecording() async {
     if (isRecording) {
       await _sendBLECommand("stop");
       setState(() => isRecording = false);
-
-      // Save / Discard dialog
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -220,16 +245,16 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _saveWorkout();                       // proceed with current save
+                _saveWorkout();
               },
               child: const Text("Save"),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                setState(() {                         // clear buffers
-                  emgData.clear();
-                  newSamples.clear();
+                setState(() {
+                  multiChannelEmgData.clear();
+                  multiChannelNewSamples.clear();
                   latestValue = "-";
                   latestTimestamp = null;
                   startTimestamp = null;
@@ -244,14 +269,13 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
         ),
       );
     } else {
-      emgData.clear();
-      newSamples.clear();
+      multiChannelEmgData.clear();
+      multiChannelNewSamples.clear();
       startTimestamp = null;
       await _sendBLECommand("start");
       setState(() => isRecording = true);
     }
   }
-  // ------------------------------------------------------------------------
 
   Future<void> _sendBLECommand(String command) async {
     if (writeChar != null && isConnected) {
@@ -269,11 +293,9 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
       final dir = await getTemporaryDirectory();
       final csvFile = File('${dir.path}/emg_${DateTime.now().millisecondsSinceEpoch}.csv');
       await csvFile.writeAsString(csvData);
-
       final user = await Amplify.Auth.getCurrentUser();
       final userId = user.userId;
       final key = 'emg/$userId/${DateTime.now().toIso8601String()}.csv';
-
       final operation = Amplify.Storage.uploadFile(
         localFile: AWSFile.fromPath(csvFile.path),
         key: key,
@@ -281,7 +303,6 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
       );
       await operation.result;
       await csvFile.delete();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Workout uploaded. Lambda will process session.")),
       );
@@ -293,12 +314,12 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   }
 
   String _convertEMGDataToCSV() {
-    if (emgData.isEmpty) return "";
-    StringBuffer buffer = StringBuffer("timestamp_ms,emg_value\n");
-    int start = startTimestamp ?? 0;
-    for (int i = 0; i < emgData.length; i++) {
-      buffer.writeln("${start + i},${emgData[i]}");
-    }
+    if (multiChannelEmgData.isEmpty) return "";
+    StringBuffer buffer = StringBuffer();
+    buffer.write("timestamp_ms");
+    for (int i = 0; i < numChannels; i++) buffer.write(",emg_ch${i + 1}");
+    buffer.writeln();
+    for (var row in multiChannelEmgData) buffer.writeln(row.join(","));
     return buffer.toString();
   }
 
@@ -365,7 +386,7 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
             const SizedBox(height: 16),
             Expanded(
               child: CustomPaint(
-                painter: EMGPainter(newSamples),
+                painter: EMGPainter(multiChannelNewSamples, numChannels),
                 child: Container(),
               ),
             ),
@@ -389,23 +410,24 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
 }
 
 class EMGPainter extends CustomPainter {
-  final List<int> data;
-  EMGPainter(this.data);
+  final List<List<int>> data;
+  final int numChannels;
+  EMGPainter(this.data, this.numChannels);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.blueAccent
-      ..strokeWidth = 2.0;
-    if (data.length < 2) return;
-    final double scaleY = size.height / 65536.0;
-    final double dx = size.width / (data.length - 1);
-    for (int i = 0; i < data.length - 1; i++) {
-      final y1 = size.height / 2 - data[i] * scaleY;
-      final y2 = size.height / 2 - data[i + 1] * scaleY;
-      final p1 = Offset(i * dx, y1);
-      final p2 = Offset((i + 1) * dx, y2);
-      canvas.drawLine(p1, p2, paint);
+    if (data.length < 2 || numChannels == 0) return;
+    final channelHeight = size.height / numChannels;
+    final dx = size.width / (data.length - 1);
+    for (int ch = 0; ch < numChannels; ch++) {
+      final paint = Paint()
+        ..color = Colors.primaries[ch % Colors.primaries.length]
+        ..strokeWidth = 1.5;
+      for (int i = 0; i < data.length - 1; i++) {
+        final y1 = channelHeight * (ch + 0.5) - data[i][ch + 1] * (channelHeight / 65536.0);
+        final y2 = channelHeight * (ch + 0.5) - data[i + 1][ch + 1] * (channelHeight / 65536.0);
+        canvas.drawLine(Offset(i * dx, y1), Offset((i + 1) * dx, y2), paint);
+      }
     }
   }
 
