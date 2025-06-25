@@ -7,6 +7,9 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:amplify_storage_s3/amplify_storage_s3.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import '../../models/SleeveConfig.dart';
+import '../../models/ModelProvider.dart';
+
 
 class LiveWorkoutScreen extends StatefulWidget {
   const LiveWorkoutScreen({super.key});
@@ -21,6 +24,8 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   BluetoothDevice? connectedDevice;
   BluetoothCharacteristic? notifyChar;
   BluetoothCharacteristic? writeChar;
+  List<String> channelLabels = [];
+
 
   int numChannels = 1;
   List<List<int>> multiChannelEmgData = [];
@@ -137,40 +142,59 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   }
 
   Future<void> _connectToDevice(BluetoothDevice device) async {
-    connectedDevice = device;
-    if (device.connectionState != BluetoothConnectionState.connected) {
-      await device.connect(timeout: const Duration(seconds: 15));
+  connectedDevice = device;
+  if (device.connectionState != BluetoothConnectionState.connected) {
+    await device.connect(timeout: const Duration(seconds: 15));
+  }
+  try {
+    await device.requestMtu(247);
+  } catch (_) {}
+  try {
+    await device.requestConnectionPriority(connectionPriorityRequest: ConnectionPriority.high);
+  } catch (_) {}
+
+  connectionSubscription = device.connectionState.listen(_handleConnectionStateChange);
+
+  // ↓ Query and apply SleeveConfig if device name contains 'Deez'
+  if (device.name.contains("Deez")) {
+    try {
+      final configs = await Amplify.DataStore.query(SleeveConfig.classType,
+        where: SleeveConfig.DEVICENAMECONTAINS.eq("Deez"));
+      if (configs.isNotEmpty) {
+        channelLabels = configs.first.channelLabels;
+        numChannels = channelLabels.length;
+        debugPrint("Applied SleeveConfig for Deez: $channelLabels");
+      }
+    } catch (e) {
+      debugPrint("Failed to fetch SleeveConfig: $e");
     }
-    try {
-      await device.requestMtu(247);
-    } catch (_) {}
-    try {
-      await device.requestConnectionPriority(connectionPriorityRequest: ConnectionPriority.high);
-    } catch (_) {}
-    connectionSubscription = device.connectionState.listen(_handleConnectionStateChange);
-    List<BluetoothService> services = await device.discoverServices();
-    for (BluetoothService service in services) {
-      if (service.uuid.toString() == serviceUUID) {
-        for (BluetoothCharacteristic c in service.characteristics) {
-          if (c.uuid.toString() == charUUID) {
-            if (c.properties.notify) {
-              notifyChar = c;
-              await c.setNotifyValue(true);
-              notifySubscription = c.onValueReceived.listen(_handleNotification);
-            }
-            if (c.properties.write) {
-              writeChar = c;
-            }
+  }
+
+  List<BluetoothService> services = await device.discoverServices();
+  for (BluetoothService service in services) {
+    if (service.uuid.toString() == serviceUUID) {
+      for (BluetoothCharacteristic c in service.characteristics) {
+        if (c.uuid.toString() == charUUID) {
+          if (c.properties.notify) {
+            notifyChar = c;
+            await c.setNotifyValue(true);
+            notifySubscription = c.onValueReceived.listen(_handleNotification);
+          }
+          if (c.properties.write) {
+            writeChar = c;
           }
         }
-        break;
       }
+      break;
     }
-    setState(() {
-      isConnected = true;
-      connectionStatus = "Connected";
-    });
   }
+
+  setState(() {
+    isConnected = true;
+    connectionStatus = "Connected";
+  });
+}
+
 
   void _handleConnectionStateChange(BluetoothConnectionState state) {
     setState(() {
@@ -314,14 +338,31 @@ class _LiveWorkoutScreenState extends State<LiveWorkoutScreen> {
   }
 
   String _convertEMGDataToCSV() {
-    if (multiChannelEmgData.isEmpty) return "";
-    StringBuffer buffer = StringBuffer();
-    buffer.write("timestamp_ms");
-    for (int i = 0; i < numChannels; i++) buffer.write(",emg_ch${i + 1}");
-    buffer.writeln();
-    for (var row in multiChannelEmgData) buffer.writeln(row.join(","));
-    return buffer.toString();
+  if (multiChannelEmgData.isEmpty) return "";
+
+  StringBuffer buffer = StringBuffer();
+
+  // Write headers
+  buffer.write("timestamp_ms");
+  if (channelLabels.isNotEmpty && channelLabels.length == numChannels) {
+    for (final label in channelLabels) {
+      buffer.write(",$label");
+    }
+  } else {
+    for (int i = 0; i < numChannels; i++) {
+      buffer.write(",emg_ch${i + 1}");
+    }
   }
+  buffer.writeln();
+
+  // Write data
+  for (var row in multiChannelEmgData) {
+    buffer.writeln(row.join(","));
+  }
+
+  return buffer.toString();
+}
+
 
   @override
   void dispose() {

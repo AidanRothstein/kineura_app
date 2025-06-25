@@ -1,12 +1,7 @@
-type Session @model
-  @auth(rules: [
-    { allow: owner },                         # App users (Cognito)
-    { allow: private, provider: iam }         # Lambda or backend (IAM)
-    { allow: public, provider: apiKey, operations: [create] }  # 👈 Allow Lambda via API key
-  ]) {
+type Session @model @auth(rules: [{allow: owner}, {allow: private, provider: iam}, {allow: public, provider: apiKey, operations: [create]}]) {
   id: ID!
   userID: String!
-  owner: String!          # ★ add this line
+  owner: String!
   timestamp: AWSDateTime!
   durationSeconds: Int
   emgS3Key: String
@@ -14,33 +9,45 @@ type Session @model
   imuS3Key: String
   workoutType: String
   notes: String
-  peakRMS: Float
-  averageRMS: Float
-  fatigueIndex: Float
-  elasticityIndex: Float
-  activationRatio: Float
-  medianFrequency: Float
-  meanFrequency: Float
-  signalToNoiseRatio: Float
-  baselineDrift: Float
-  zeroCrossingRate: Float
+  emg_ch1_peakRMS: Float
+  emg_ch1_averageRMS: Float
+  emg_ch1_fatigueIndex: Float
+  emg_ch1_elasticityIndex: Float
+  emg_ch1_activationRatio: Float
+  emg_ch1_medianFrequency: Float
+  emg_ch1_meanFrequency: Float
+  emg_ch1_signalToNoiseRatio: Float
+  emg_ch1_baselineDrift: Float
+  emg_ch1_zeroCrossingRate: Float
+  emg_ch1_rateOfRise: Float
+  emg_ch1_rateOfFall: Float
+  emg_ch1_rfdAnalog: Float
+  emg_ch1_snrTimeRaw: Float
+  emg_ch1_snrTimeDenoised: Float
+  emg_ch1_snrFreqRaw: Float
+  emg_ch1_snrFreqDenoised: Float
 
-   # 🚀 Add these:
-  rateOfRise: Float
-  rateOfFall: Float
-  rfdAnalog: Float
-  snrTimeRaw: Float
-  snrTimeDenoised: Float
-  snrFreqRaw: Float
-  snrFreqDenoised: Float
+  emg_ch2_peakRMS: Float
+  emg_ch2_averageRMS: Float
+  emg_ch2_fatigueIndex: Float
+  emg_ch2_elasticityIndex: Float
+  emg_ch2_activationRatio: Float
+  emg_ch2_medianFrequency: Float
+  emg_ch2_meanFrequency: Float
+  emg_ch2_signalToNoiseRatio: Float
+  emg_ch2_baselineDrift: Float
+  emg_ch2_zeroCrossingRate: Float
+  emg_ch2_rateOfRise: Float
+  emg_ch2_rateOfFall: Float
+  emg_ch2_rfdAnalog: Float
+  emg_ch2_snrTimeRaw: Float
+  emg_ch2_snrTimeDenoised: Float
+  emg_ch2_snrFreqRaw: Float
+  emg_ch2_snrFreqDenoised: Float
+
 }
 
-
-type Article @model
-  @auth(rules: [
-    { allow: public, operations: [read] }
-    { allow: groups, groups: ["Editors"], operations: [read, create, update, delete] }
-  ]) {
+type Article @model @auth(rules: [{allow: public, operations: [read]}, {allow: groups, groups: ["Editors"], operations: [read, create, update, delete]}]) {
   id: ID!
   title: String!
   content: String!
@@ -53,3 +60,12 @@ type Article @model
   readTime: Int!
   isPublished: Boolean!
 }
+
+type SleeveConfig @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  deviceType: String!
+  side: String!
+  channelLabels: [String!]!
+  deviceNameContains: String
+}
+ 
