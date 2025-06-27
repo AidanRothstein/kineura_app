@@ -25,7 +25,7 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
       query ListSessions {
         listSessions(limit: 1000) {
           items {
-            id
+              id
             userID
             timestamp
             durationSeconds
@@ -34,16 +34,42 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
             imuS3Key
             workoutType
             notes
-            peakRMS
-            averageRMS
-            fatigueIndex
-            elasticityIndex
-            activationRatio
-            medianFrequency
-            meanFrequency
-            signalToNoiseRatio
-            baselineDrift
-            zeroCrossingRate
+
+            emg_ch1_peakRMS
+            emg_ch1_averageRMS
+            emg_ch1_fatigueIndex
+            emg_ch1_elasticityIndex
+            emg_ch1_activationRatio
+            emg_ch1_medianFrequency
+            emg_ch1_meanFrequency
+            emg_ch1_signalToNoiseRatio
+            emg_ch1_baselineDrift
+            emg_ch1_zeroCrossingRate
+            emg_ch1_rateOfRise
+            emg_ch1_rateOfFall
+            emg_ch1_rfdAnalog
+            emg_ch1_snrTimeRaw
+            emg_ch1_snrTimeDenoised
+            emg_ch1_snrFreqRaw
+            emg_ch1_snrFreqDenoised
+
+            emg_ch2_peakRMS
+            emg_ch2_averageRMS
+            emg_ch2_fatigueIndex
+            emg_ch2_elasticityIndex
+            emg_ch2_activationRatio
+            emg_ch2_medianFrequency
+            emg_ch2_meanFrequency
+            emg_ch2_signalToNoiseRatio
+            emg_ch2_baselineDrift
+            emg_ch2_zeroCrossingRate
+            emg_ch2_rateOfRise
+            emg_ch2_rateOfFall
+            emg_ch2_rfdAnalog
+            emg_ch2_snrTimeRaw
+            emg_ch2_snrTimeDenoised
+            emg_ch2_snrFreqRaw
+            emg_ch2_snrFreqDenoised
           }
         }
       }
