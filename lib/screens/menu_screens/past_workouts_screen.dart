@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:amplify_api/amplify_api.dart';   // 👈 make sure this import is here
 import 'package:amplify_flutter/amplify_flutter.dart';
-import 'workout_detail_screen.dart'; // Placeholder screen for details
+import 'workout_detail_screen.dart';
 
 class PastWorkoutsScreen extends StatefulWidget {
   const PastWorkoutsScreen({super.key});
@@ -16,33 +17,81 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
   @override
   void initState() {
     super.initState();
-    _sessionsFuture = fetchSessions();
+    _sessionsFuture = _fetchSessions();
   }
 
-  Future<List<Map<String, dynamic>>> fetchSessions() async {
-    const listSessionsQuery = '''query ListSessions {
-      listSessions(limit: 1000) {
-        items {
-          id
-          timestamp
-          durationSeconds
-          workoutType
-          notes
-          emgS3Key
+  Future<List<Map<String, dynamic>>> _fetchSessions() async {
+    const query = r'''
+      query ListSessions {
+        listSessions(limit: 1000) {
+          items {
+              id
+            userID
+            timestamp
+            durationSeconds
+            emgS3Key
+            emgProcessedS3Key
+            imuS3Key
+            workoutType
+            notes
+
+            emg_ch1_peakRMS
+            emg_ch1_averageRMS
+            emg_ch1_fatigueIndex
+            emg_ch1_elasticityIndex
+            emg_ch1_activationRatio
+            emg_ch1_medianFrequency
+            emg_ch1_meanFrequency
+            emg_ch1_signalToNoiseRatio
+            emg_ch1_baselineDrift
+            emg_ch1_zeroCrossingRate
+            emg_ch1_rateOfRise
+            emg_ch1_rateOfFall
+            emg_ch1_rfdAnalog
+            emg_ch1_snrTimeRaw
+            emg_ch1_snrTimeDenoised
+            emg_ch1_snrFreqRaw
+            emg_ch1_snrFreqDenoised
+
+            emg_ch2_peakRMS
+            emg_ch2_averageRMS
+            emg_ch2_fatigueIndex
+            emg_ch2_elasticityIndex
+            emg_ch2_activationRatio
+            emg_ch2_medianFrequency
+            emg_ch2_meanFrequency
+            emg_ch2_signalToNoiseRatio
+            emg_ch2_baselineDrift
+            emg_ch2_zeroCrossingRate
+            emg_ch2_rateOfRise
+            emg_ch2_rateOfFall
+            emg_ch2_rfdAnalog
+            emg_ch2_snrTimeRaw
+            emg_ch2_snrTimeDenoised
+            emg_ch2_snrFreqRaw
+            emg_ch2_snrFreqDenoised
+          }
         }
       }
-    }''';
+    ''';
 
     try {
-      final request = GraphQLRequest<String>(document: listSessionsQuery);
+      final request = GraphQLRequest<String>(
+        document: query,
+        authorizationMode:
+             APIAuthorizationType.userPools,          // ⭐ use the API key to read
+      );
+
       final response = await Amplify.API.query(request: request).response;
-      final data = jsonDecode(response.data!)['listSessions']['items'];
-      final sessions = List<Map<String, dynamic>>.from(data);
+      final items =
+          jsonDecode(response.data!)['listSessions']['items'] as List<dynamic>;
+      final sessions = List<Map<String, dynamic>>.from(items);
+
       sessions.sort((a, b) =>
           DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp'])));
       return sessions;
     } catch (e) {
-      print("Failed to fetch sessions: $e");
+      debugPrint('Failed to fetch sessions: $e');
       return [];
     }
   }
@@ -60,7 +109,7 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
           if (snapshot.hasError) {
             return const Center(child: Text('Failed to load workouts'));
           }
-          final sessions = snapshot.data!;
+          final sessions = snapshot.data ?? [];
           if (sessions.isEmpty) {
             return const Center(child: Text('No workouts found.'));
           }
@@ -68,39 +117,36 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
           return ListView.builder(
             itemCount: sessions.length,
             itemBuilder: (context, index) {
-              final session = sessions[index];
-              final timestamp = DateTime.parse(session['timestamp']).toLocal();
-              final duration = session['durationSeconds'] ?? 0;
-              final workoutType = session['workoutType'] ?? 'Unknown';
-              final notes = session['notes'] ?? '';
+              final s = sessions[index];
+              final ts = DateTime.parse(s['timestamp']).toLocal();
+              final dur = s['durationSeconds'] ?? 0;
+              final type = s['workoutType'] ?? 'Unknown';
+              final notes = s['notes'] ?? '';
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(12),
-                  title: Text(
-                    workoutType,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  title: Text(type,
+                      style:
+                          const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Date: ${timestamp.toLocal()}'),
-                      Text('Duration: ${duration}s'),
+                      Text('Date: $ts'),
+                      Text('Duration: ${dur}s'),
                       if (notes.isNotEmpty) Text('Notes: $notes'),
                     ],
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            WorkoutDetailScreen(sessionData: session),
-                      ),
-                    );
-                  },
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WorkoutDetailScreen(sessionData: s),
+                    ),
+                  ),
                 ),
               );
             },

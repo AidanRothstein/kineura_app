@@ -1,48 +1,53 @@
-# This "input" configures a global authorization rule to enable public access to
-# all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/cli/graphql/authorization-rules
-input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
-
-type Session
-  @model
-  @auth(rules: [{ allow: owner, ownerField: "userID" }]) {
+type Session @model @auth(rules: [{allow: owner}, {allow: private, provider: iam}, {allow: public, provider: apiKey, operations: [create]}]) {
   id: ID!
-  userID: ID! @index(name: "byUser", sortKeyFields: ["timestamp"])
+  userID: String!
+  owner: String!
   timestamp: AWSDateTime!
   durationSeconds: Int
-  emgS3Key: String!
+  emgS3Key: String
+  emgProcessedS3Key: String
   imuS3Key: String
   workoutType: String
   notes: String
+  emg_ch1_peakRMS: Float
+  emg_ch1_averageRMS: Float
+  emg_ch1_fatigueIndex: Float
+  emg_ch1_elasticityIndex: Float
+  emg_ch1_activationRatio: Float
+  emg_ch1_medianFrequency: Float
+  emg_ch1_meanFrequency: Float
+  emg_ch1_signalToNoiseRatio: Float
+  emg_ch1_baselineDrift: Float
+  emg_ch1_zeroCrossingRate: Float
+  emg_ch1_rateOfRise: Float
+  emg_ch1_rateOfFall: Float
+  emg_ch1_rfdAnalog: Float
+  emg_ch1_snrTimeRaw: Float
+  emg_ch1_snrTimeDenoised: Float
+  emg_ch1_snrFreqRaw: Float
+  emg_ch1_snrFreqDenoised: Float
 
-  # Processed EMG data
-  emgProcessedS3Key: String
+  emg_ch2_peakRMS: Float
+  emg_ch2_averageRMS: Float
+  emg_ch2_fatigueIndex: Float
+  emg_ch2_elasticityIndex: Float
+  emg_ch2_activationRatio: Float
+  emg_ch2_medianFrequency: Float
+  emg_ch2_meanFrequency: Float
+  emg_ch2_signalToNoiseRatio: Float
+  emg_ch2_baselineDrift: Float
+  emg_ch2_zeroCrossingRate: Float
+  emg_ch2_rateOfRise: Float
+  emg_ch2_rateOfFall: Float
+  emg_ch2_rfdAnalog: Float
+  emg_ch2_snrTimeRaw: Float
+  emg_ch2_snrTimeDenoised: Float
+  emg_ch2_snrFreqRaw: Float
+  emg_ch2_snrFreqDenoised: Float
 
-  # EMG metrics
-  averageRMS: Float
-  peakRMS: Float
-  fatigueIndex: Float
-  elasticityIndex: Float
-  activationRatio: Float
-  medianFrequency: Float
-  meanFrequency: Float
-  signalToNoiseRatio: Float
-  baselineDrift: Float
-  zeroCrossingRate: Float
-  rateOfRise: Float
-  rateOfFall: Float
-  rfdAnalog: Float
-  snrTimeRaw: Float
-  snrTimeDenoised: Float
-  snrFreqRaw: Float
-  snrFreqDenoised: Float
 }
 
-
-type Article @model
-  @auth(rules: [
-    { allow: public, operations: [read] }
-    { allow: groups, groups: ["Editors"], operations: [read, create, update, delete] }
-  ]) {
+type Article @model @auth(rules: [{allow: public, operations: [read]}, {allow: groups, groups: ["Editors"], operations: [read, create, update, delete]}]) {
   id: ID!
   title: String!
   content: String!
@@ -55,3 +60,12 @@ type Article @model
   readTime: Int!
   isPublished: Boolean!
 }
+
+type SleeveConfig @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  deviceType: String!
+  side: String!
+  channelLabels: [String!]!
+  deviceNameContains: String
+}
+ 

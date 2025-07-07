@@ -85,7 +85,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (var r in results) {
         final name = r.device.platformName;
-        if (name.contains("Deez")) {
+        if (name.contains("Kineura")) {
           unique[r.device.remoteId.str] = r;
         }
       }

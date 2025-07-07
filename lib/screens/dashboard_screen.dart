@@ -158,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _navButton(icon: Icons.school, label: 'Learn', onTap: () => _navigateTo(const LearnScreen())),
+              //_navButton(icon: Icons.school, label: 'Learn', onTap: () => _navigateTo(const LearnScreen())),
               _navButton(icon: Icons.history, label: 'Past Workouts', onTap: () => _navigateTo(const PastWorkoutsScreen())),
               const SizedBox(width: 48),
               _navButton(icon: Icons.devices, label: 'My Devices', onTap: () => _navigateTo(const MyDevicesScreen())),
