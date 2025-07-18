@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:amplify_api/amplify_api.dart';   // 👈 make sure this import is here
+import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'workout_detail_screen.dart';
 
@@ -78,17 +78,14 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
     try {
       final request = GraphQLRequest<String>(
         document: query,
-        authorizationMode:
-             APIAuthorizationType.userPools,          // ⭐ use the API key to read
+        authorizationMode: APIAuthorizationType.userPools,
       );
 
       final response = await Amplify.API.query(request: request).response;
-      final items =
-          jsonDecode(response.data!)['listSessions']['items'] as List<dynamic>;
+      final items = jsonDecode(response.data!)['listSessions']['items'] as List<dynamic>;
       final sessions = List<Map<String, dynamic>>.from(items);
 
-      sessions.sort((a, b) =>
-          DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp'])));
+      sessions.sort((a, b) => DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp'])));
       return sessions;
     } catch (e) {
       debugPrint('Failed to fetch sessions: $e');
@@ -99,19 +96,25 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Past Workouts')),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Past Workouts'),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+        elevation: 4,
+      ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _sessionsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Colors.white));
           }
           if (snapshot.hasError) {
-            return const Center(child: Text('Failed to load workouts'));
+            return const Center(child: Text('Failed to load workouts', style: TextStyle(color: Colors.white70)));
           }
           final sessions = snapshot.data ?? [];
           if (sessions.isEmpty) {
-            return const Center(child: Text('No workouts found.'));
+            return const Center(child: Text('No workouts found.', style: TextStyle(color: Colors.white70)));
           }
 
           return ListView.builder(
@@ -125,20 +128,28 @@ class _PastWorkoutsScreenState extends State<PastWorkoutsScreen> {
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                elevation: 4,
-                shape:
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                color: Colors.grey[850],
+                elevation: 6,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-                  title: Text(type,
-                      style:
-                          const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  contentPadding: const EdgeInsets.all(16),
+                  title: Text(
+                    type,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontFamily: 'SourceSans3',
+                    ),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Date: $ts'),
-                      Text('Duration: ${dur}s'),
-                      if (notes.isNotEmpty) Text('Notes: $notes'),
+                      const SizedBox(height: 4),
+                      Text('Date: $ts', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
+                      Text('Duration: ${dur}s', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
+                      if (notes.isNotEmpty)
+                        Text('Notes: $notes', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
                     ],
                   ),
                   onTap: () => Navigator.push(

@@ -44,7 +44,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       final tempDir = await getTemporaryDirectory();
       final localPath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_processed.csv';
 
-
       await Amplify.Storage.downloadFile(
         key: logicalKey,
         localFile: AWSFile.fromPath(localPath),
@@ -133,7 +132,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final fSpots = _channelFiltered[channel] ?? [];
     final rSpots = _channelRMS[channel] ?? [];
     if (fSpots.length < 2 || rSpots.length < 2) {
-      return const Text('Not enough EMG data to show graph.');
+      return const Text('Not enough EMG data to show graph.', style: TextStyle(color: Colors.white70));
     }
 
     final minX = fSpots.map((e) => e.x).reduce(min);
@@ -144,7 +143,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(channel, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(channel, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'SourceSans3')),
         const SizedBox(height: 4),
         SizedBox(
           height: 250,
@@ -177,14 +176,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   sideTitles: SideTitles(
                     showTitles: true,
                     interval: ((maxX - minX) / 6).clamp(0.1, double.infinity),
-                    getTitlesWidget: (value, _) => Text('${value.toStringAsFixed(1)}s', style: const TextStyle(fontSize: 10)),
+                    getTitlesWidget: (value, _) => Text('${value.toStringAsFixed(1)}s', style: const TextStyle(fontSize: 10, color: Colors.white)),
                   ),
                 ),
                 rightTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
                     interval: ((maxY - minY) / 6).clamp(1.0, double.infinity),
-                    getTitlesWidget: (value, _) => Text(value.toStringAsFixed(0), style: const TextStyle(fontSize: 10)),
+                    getTitlesWidget: (value, _) => Text(value.toStringAsFixed(0), style: const TextStyle(fontSize: 10, color: Colors.white)),
                   ),
                 ),
               ),
@@ -198,11 +197,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           children: const [
             Icon(Icons.square, color: Colors.blue, size: 12),
             SizedBox(width: 4),
-            Text('Filtered EMG'),
+            Text('Filtered EMG', style: TextStyle(color: Colors.white70)),
             SizedBox(width: 12),
             Icon(Icons.square, color: Colors.orange, size: 12),
             SizedBox(width: 4),
-            Text('RMS Envelope'),
+            Text('RMS Envelope', style: TextStyle(color: Colors.white70)),
           ],
         ),
         const SizedBox(height: 16),
@@ -215,15 +214,18 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     metrics.sort((a, b) => a.key.compareTo(b.key));
 
     return DataTable(
+      columnSpacing: 24,
+      headingRowColor: MaterialStateColor.resolveWith((states) => Colors.grey[900]!),
+      dataRowColor: MaterialStateColor.resolveWith((states) => Colors.grey[850]!),
       columns: const [
-        DataColumn(label: Text('Metric')),
-        DataColumn(label: Text('Value')),
+        DataColumn(label: Text('Metric', style: TextStyle(color: Colors.white, fontFamily: 'SourceSans3'))),
+        DataColumn(label: Text('Value', style: TextStyle(color: Colors.white, fontFamily: 'SourceSans3'))),
       ],
       rows: metrics.map((e) {
         final display = e.value is num ? (e.value as num).toStringAsFixed(4) : 'N/A';
         return DataRow(cells: [
-          DataCell(Text(e.key)),
-          DataCell(Text(display)),
+          DataCell(Text(e.key, style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3'))),
+          DataCell(Text(display, style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3'))),
         ]);
       }).toList(),
     );
@@ -234,24 +236,33 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final timestamp = DateTime.parse(widget.sessionData['timestamp']).toLocal();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Workout Details')),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Workout Details', style: TextStyle(fontFamily: 'SourceSans3')),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            Text('Workout Type: ${widget.sessionData['workoutType']}'),
-            Text('Timestamp: $timestamp'),
-            Text('Duration: ${widget.sessionData['durationSeconds']}s'),
-            Text('Notes: ${widget.sessionData['notes'] ?? "None"}'),
+            Text('Workout Type: ${widget.sessionData['workoutType']}', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
+            Text('Timestamp: $timestamp', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
+            Text('Duration: ${widget.sessionData['durationSeconds']}s', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
+            Text('Notes: ${widget.sessionData['notes'] ?? "None"}', style: const TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
             const SizedBox(height: 20),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1976D2),
+                foregroundColor: Colors.white,
+              ),
               onPressed: _loading ? null : _downloadAndParseEMG,
-              child: const Text('Download Processed EMG'),
+              child: const Text('Download Processed EMG', style: TextStyle(fontFamily: 'SourceSans3')),
             ),
             const SizedBox(height: 20),
-            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (_loading) const Center(child: CircularProgressIndicator(color: Colors.white)),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: Colors.red)),
+              Text(_error!, style: const TextStyle(color: Colors.red, fontFamily: 'SourceSans3')),
             ..._channelFiltered.keys.map(_buildChart).toList(),
             const SizedBox(height: 24),
             _buildMetricsTable(),

@@ -131,12 +131,11 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
   }
 
   Future<void> _clearAllDevices() async {
-    // Disconnect all connected devices
     for (BluetoothDevice device in connectedDevices) {
       try {
         await device.disconnect();
       } catch (e) {
-        print("Failed to disconnect device ${device.remoteId}: $e");
+        print("Failed to disconnect device \${device.remoteId}: $e");
       }
     }
 
@@ -153,15 +152,18 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
+        contentTextStyle: const TextStyle(color: Colors.white70),
         title: const Text('Clear all devices?'),
         content: const Text('This will remove and disconnect all saved devices.'),
         actions: [
           TextButton(
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           TextButton(
-            child: const Text('Clear'),
+            child: const Text('Clear', style: TextStyle(color: Colors.redAccent)),
             onPressed: () async {
               Navigator.of(context).pop();
               await _clearAllDevices();
@@ -179,6 +181,9 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
+              contentTextStyle: const TextStyle(color: Colors.white70),
               title: const Text('Bluetooth Devices'),
               content: SizedBox(
                 width: double.maxFinite,
@@ -205,9 +210,9 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
                                 final device = _scanResults[index].device;
                                 final name = device.platformName.isNotEmpty ? device.platformName : '(unknown)';
                                 return ListTile(
-                                  title: Text(name),
-                                  subtitle: Text(device.remoteId.str),
-                                  trailing: Text('${_scanResults[index].rssi} dBm'),
+                                  title: Text(name, style: const TextStyle(color: Colors.white)),
+                                  subtitle: Text(device.remoteId.str, style: const TextStyle(color: Colors.white70)),
+                                  trailing: Text('${_scanResults[index].rssi} dBm', style: const TextStyle(color: Colors.white70)),
                                   onTap: () => _connectToDevice(device),
                                 );
                               },
@@ -227,7 +232,7 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
                     if (mounted) setStateDialog(() => isScanning = false);
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Close'),
+                  child: const Text('Close', style: TextStyle(color: Colors.white70)),
                 ),
               ],
             );
@@ -240,86 +245,106 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('My Devices Screen'),
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('My Devices Screen', style: TextStyle(color: Colors.white)),
         leading: IconButton(
-          icon: const Icon(Icons.remove),
-          tooltip: 'Clear Devices',
-          onPressed: _showClearDevicesDialog,
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _refreshDeviceStatus,
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Connected Devices', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (connectedDevices.isEmpty)
-              const Text('No devices connected.')
-            else
-              Column(
-                children: connectedDevices.map((device) {
-                  return ListTile(
-                    title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.circle, color: Colors.green, size: 12),
-                        const SizedBox(width: 6),
-                        const Text('Connected'),
-                        IconButton(
-                          icon: const Icon(Icons.link_off),
-                          tooltip: 'Disconnect',
-                          onPressed: () => _disconnectFromDevice(device),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Connected Devices', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 8),
+                if (connectedDevices.isEmpty)
+                  const Text('No devices connected.', style: TextStyle(color: Colors.white70))
+                else
+                  Column(
+                    children: connectedDevices.map((device) {
+                      return ListTile(
+                        title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)', style: const TextStyle(color: Colors.white)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.circle, color: Colors.green, size: 12),
+                            const SizedBox(width: 6),
+                            const Text('Connected', style: TextStyle(color: Colors.white70)),
+                            IconButton(
+                              icon: const Icon(Icons.link_off, color: Colors.white70),
+                              tooltip: 'Disconnect',
+                              onPressed: () => _disconnectFromDevice(device),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: 16),
+                const Text('Previously Connected Devices', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 8),
+                if (previouslyConnectedDevices.isEmpty)
+                  const Text('No previous devices.', style: TextStyle(color: Colors.white70))
+                else
+                  Column(
+                    children: previouslyConnectedDevices.where((device) =>
+                      !connectedDevices.any((c) => c.remoteId == device.remoteId)
+                    ).map((device) {
+                      final isAvailable = _scanResults.any((r) => r.device.remoteId == device.remoteId);
+                      return ListTile(
+                        title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)', style: const TextStyle(color: Colors.white)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, color: isAvailable ? Colors.orange : Colors.grey, size: 12),
+                            const SizedBox(width: 6),
+                            Text(isAvailable ? 'Available' : 'Offline', style: const TextStyle(color: Colors.white70)),
+                            if (isAvailable)
+                              IconButton(
+                                icon: const Icon(Icons.link, color: Colors.white70),
+                                tooltip: 'Reconnect',
+                                onPressed: () => _connectToDevice(device),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 90,
+            child: ElevatedButton.icon(
+              onPressed: _showClearDevicesDialog,
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear Devices'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[700],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
-            const SizedBox(height: 16),
-            const Text('Previously Connected Devices', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (previouslyConnectedDevices.isEmpty)
-              const Text('No previous devices.')
-            else
-              Column(
-                children: previouslyConnectedDevices.where((device) =>
-                  !connectedDevices.any((c) => c.remoteId == device.remoteId)
-                ).map((device) {
-                  final isAvailable = _scanResults.any((r) => r.device.remoteId == device.remoteId);
-                  return ListTile(
-                    title: Text(device.platformName.isNotEmpty ? device.platformName : '(unknown)'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.circle, color: isAvailable ? Colors.orange : Colors.grey, size: 12),
-                        const SizedBox(width: 6),
-                        Text(isAvailable ? 'Available' : 'Offline'),
-                        if (isAvailable)
-                          IconButton(
-                            icon: const Icon(Icons.link),
-                            tooltip: 'Reconnect',
-                            onPressed: () => _connectToDevice(device),
-                          ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showBluetoothDevicesDialog(context),
-        child: const Icon(Icons.add),
+        backgroundColor: const Color(0xFF2979FF),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
