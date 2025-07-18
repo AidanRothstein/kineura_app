@@ -40,12 +40,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('Connected Devices'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: Colors.black.withOpacity(0.8),
+              title: const Text('Connected Devices', style: TextStyle(color: Colors.white, fontFamily: 'SourceSans3')),
               content: SizedBox(
                 width: double.maxFinite,
                 height: 300,
                 child: connectedDevices.isEmpty
-                    ? const Center(child: Text('No connected devices'))
+                    ? const Center(child: Text('No connected devices', style: TextStyle(color: Colors.white70)))
                     : ListView.builder(
                         itemCount: connectedDevices.length,
                         itemBuilder: (context, index) {
@@ -55,11 +57,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final name = device.platformName.isNotEmpty ? device.platformName : '(unknown)';
 
                           return ListTile(
-                            title: Text(name),
-                            subtitle: Text(deviceId),
+                            title: Text(name, style: const TextStyle(color: Colors.white)),
+                            subtitle: Text(deviceId, style: const TextStyle(color: Colors.white70)),
                             trailing: isSelected
                                 ? const Icon(Icons.check_circle, color: Colors.green)
-                                : const Icon(Icons.radio_button_unchecked),
+                                : const Icon(Icons.radio_button_unchecked, color: Colors.white54),
                             onTap: () {
                               setStateDialog(() {
                                 if (isSelected) {
@@ -76,6 +78,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               actions: [
                 if (selectedDeviceIds.isNotEmpty)
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1976D2),
+                    ),
                     onPressed: () async {
                       const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
                       const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
@@ -84,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         if (selectedDeviceIds.contains(device.remoteId.str)) {
                           try {
                             if (device.connectionState != BluetoothConnectionState.connected) {
-                              debugPrint("Connecting to ${device.remoteId}...");
+                              debugPrint("Connecting to \${device.remoteId}...");
                               await device.connect();
                             }
 
@@ -100,14 +105,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             );
 
                             if (characteristic.properties.write) {
-                              debugPrint("Writing 'start' to ${device.remoteId}...");
+                              debugPrint("Writing 'start' to \${device.remoteId}...");
                               await characteristic.write(utf8.encode("start"), withoutResponse: false);
-                              debugPrint("✅ Start command sent to ${device.remoteId}");
+                              debugPrint("✅ Start command sent to \${device.remoteId}");
                             } else {
-                              debugPrint("❌ Characteristic not writable on ${device.remoteId}");
+                              debugPrint("❌ Characteristic not writable on \${device.remoteId}");
                             }
                           } catch (e) {
-                            debugPrint("🚫 Failed to send 'start' to ${device.remoteId}: $e");
+                            debugPrint("🚫 Failed to send 'start' to \${device.remoteId}: \$e");
                           }
                         }
                       }
@@ -122,11 +127,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                       }
                     },
-                    child: const Text("Start Workout"),
+                    child: const Text("Start Workout", style: TextStyle(fontFamily: 'SourceSans3')),
                   ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Close"),
+                  child: const Text("Close", style: TextStyle(color: Colors.white70, fontFamily: 'SourceSans3')),
                 ),
               ],
             );
@@ -143,22 +148,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: const Center(
         child: Text(
           "You're in!",
-          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'SourceSans3'),
         ),
       ),
       bottomNavigationBar: BottomAppBar(
+        color: Colors.grey[900],
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        height: 80, // Increased height to prevent overflow
+        height: 80,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0), // Added vertical padding
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              //_navButton(icon: Icons.school, label: 'Learn', onTap: () => _navigateTo(const LearnScreen())),
               _navButton(icon: Icons.history, label: 'Past Workouts', onTap: () => _navigateTo(const PastWorkoutsScreen())),
               const SizedBox(width: 48),
               _navButton(icon: Icons.devices, label: 'My Devices', onTap: () => _navigateTo(const MyDevicesScreen())),
@@ -170,6 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       floatingActionButton: Tooltip(
         message: 'Connected Devices',
         child: FloatingActionButton(
+          backgroundColor: const Color(0xFF1976D2),
           onPressed: () {
             _loadConnectedDevices().then((_) => _showConnectedDevicesPopup(context));
           },
@@ -182,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _navButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Expanded( // Wrap with Expanded to prevent overflow
+    return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -191,15 +198,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 24), // Slightly reduced icon size
-              const SizedBox(height: 2), // Reduced spacing
-              Flexible( // Allow text to be flexible
+              Icon(icon, size: 24, color: Colors.white),
+              const SizedBox(height: 2),
+              Flexible(
                 child: Text(
                   label,
-                  style: const TextStyle(fontSize: 11), // Reduced font size
+                  style: const TextStyle(fontSize: 11, color: Colors.white70, fontFamily: 'SourceSans3'),
                   textAlign: TextAlign.center,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis, // Handle text overflow
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
